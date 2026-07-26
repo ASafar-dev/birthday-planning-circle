@@ -49,10 +49,10 @@ const state = {
 const els = {
   loading: $("#loading-screen"), app: $("#app"), joinDialog: $("#join-dialog"), joinForm: $("#join-form"),
   joinName: $("#join-name"), joinCode: $("#join-code"), joinError: $("#join-error"), demoHint: $("#demo-hint"),
-  recoveryEmail: $("#recovery-email"), recoveryButton: $("#recovery-button"), recoveryStatus: $("#recovery-status"),
+  recoveryEmail: $("#recovery-email"), recoveryPassword: $("#recovery-password"), recoveryButton: $("#recovery-button"), recoveryStatus: $("#recovery-status"),
   itemDialog: $("#item-dialog"), itemDetail: $("#item-detail"), profileDialog: $("#profile-dialog"),
   profileForm: $("#profile-form"), profileName: $("#profile-name"), sidebar: $("#sidebar"), sidebarBackdrop: $("#sidebar-backdrop"),
-  accountEmail: $("#account-email"), protectAccountButton: $("#protect-account-button"), accountProtectionStatus: $("#account-protection-status"),
+  accountEmail: $("#account-email"), accountPassword: $("#account-password"), accountPasswordConfirm: $("#account-password-confirm"), accountPasswordFields: $("#account-password-fields"), accountProtectionCopy: $("#account-protection-copy"), protectAccountButton: $("#protect-account-button"), accountProtectionStatus: $("#account-protection-status"),
   grid: $("#items-grid"), activity: $("#activity-list"),
   search: $("#search-input"), sort: $("#sort-select"), dropZone: $("#drop-zone"),
   template: $("#item-card-template"), connection: $("#connection-pill"), modeBanner: $("#mode-banner"),
@@ -72,20 +72,47 @@ function authRedirectUrl() {
   url.search = "";
   return url.toString();
 }
+function hasVerifiedEmail() {
+  return Boolean(state.user?.email && state.user?.email_confirmed_at);
+}
+function hasPasswordLogin() {
+  return Boolean(hasVerifiedEmail() && state.user?.user_metadata?.password_login_enabled);
+}
 function hasRecoverableAccount() {
-  return Boolean(state.user?.email);
+  return hasPasswordLogin();
 }
 function syncAccountProtectionUI(message = "") {
   if (!els.accountEmail || !els.protectAccountButton || !els.accountProtectionStatus) return;
-  const protectedAccount = hasRecoverableAccount();
-  els.accountEmail.value = protectedAccount ? state.user.email : state.pendingProtectionEmail;
-  els.accountEmail.disabled = protectedAccount;
-  els.protectAccountButton.disabled = protectedAccount || state.mode === "demo";
-  els.protectAccountButton.textContent = protectedAccount ? "Access protected" : "Protect my access";
-  els.accountProtectionStatus.className = `account-protection-status ${protectedAccount ? "success" : ""}`;
-  els.accountProtectionStatus.textContent = message || (protectedAccount
-    ? `Protected with ${state.user.email}. You can recover this same account from another browser.`
-    : "Add an email now so your joined items, contributions, votes, and role stay recoverable.");
+
+  const verifiedEmail = hasVerifiedEmail();
+  const passwordReady = hasPasswordLogin();
+  const emailValue = state.user?.email || state.pendingProtectionEmail || "";
+
+  els.accountEmail.value = emailValue;
+  els.accountEmail.disabled = verifiedEmail;
+  els.accountPasswordFields?.classList.toggle("hidden", !verifiedEmail || passwordReady);
+  els.protectAccountButton.disabled = passwordReady || state.mode === "demo";
+
+  if (els.accountProtectionCopy) {
+    els.accountProtectionCopy.textContent = passwordReady
+      ? "Your account is protected. Use this email and your password whenever you need to sign in on another browser or device."
+      : verifiedEmail
+        ? "Your email is verified. Create a password now to finish protecting this account."
+        : "First verify your email once. After verification, return here and create a password for normal sign-ins.";
+  }
+
+  els.protectAccountButton.textContent = passwordReady
+    ? "Password login ready"
+    : verifiedEmail
+      ? "Set my password"
+      : "Send verification email";
+
+  els.accountProtectionStatus.className = `account-protection-status ${passwordReady ? "success" : ""}`;
+  els.accountProtectionStatus.textContent = message || (passwordReady
+    ? `Protected with ${state.user.email}. Normal sign-ins now use email and password.`
+    : verifiedEmail
+      ? `Email verified: ${state.user.email}. Set a password below to finish.`
+      : "Your current contributions remain attached to this account while you complete these steps.");
 }
 function openProfileDialog() {
   els.profileName.value = state.member?.display_name || "";
@@ -97,8 +124,13 @@ function promptAccountProtection() {
   if (state.mode !== "supabase" || hasRecoverableAccount()) return;
   window.setTimeout(() => {
     openProfileDialog();
-    els.accountEmail?.focus();
-    toast("Protect your access with email before closing the site.");
+    if (hasVerifiedEmail()) {
+      els.accountPassword?.focus();
+      toast("Your email is verified. Create a password to finish protecting your access.");
+    } else {
+      els.accountEmail?.focus();
+      toast("Protect your access before closing the site.");
+    }
   }, 650);
 }
 
@@ -485,6 +517,7 @@ function enterApp() {
   renderEverything();
   setConnection(state.mode === "demo" ? "Demo mode" : "Live", state.mode === "demo" ? "offline" : "online");
   hideLoading();
+  promptAccountProtection();
 }
 
 async function joinRoom(name, code) {
@@ -583,7 +616,7 @@ function bindStaticEvents() {
     els.joinError.textContent = "";
     const button = $("button[type='submit']", els.joinForm);
     button.disabled = true;
-    try { await joinRoom(name, code); launchWelcomeConfetti(); promptAccountProtection(); }
+    try { await joinRoom(name, code); launchWelcomeConfetti(); }
     catch (error) { els.joinError.textContent = error.message || "Could not join this room."; }
     finally { button.disabled = false; }
   });
@@ -616,6 +649,11 @@ function bindStaticEvents() {
   els.profileForm.addEventListener("submit", updateProfile);
   els.protectAccountButton?.addEventListener("click", protectCurrentAccount);
   els.recoveryButton?.addEventListener("click", sendRecoveryLink);
+  [els.recoveryEmail, els.recoveryPassword].forEach(input => input?.addEventListener("keydown", event => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    sendRecoveryLink();
+  }));
   $("#suggest-venue-button").addEventListener("click", () => { $("#venue-form-error").textContent=""; els.venueForm.reset(); $("#venue-price").value="0"; $("#venue-nights").value="1"; $("#venue-capacity").value="10"; els.venueDialog.showModal(); });
   $("#close-venue-dialog").addEventListener("click", () => els.venueDialog.close());
   els.venueForm.addEventListener("submit", suggestVenue);
@@ -1284,30 +1322,65 @@ function relativeTime(value) {
 }
 
 async function protectCurrentAccount() {
-  if (state.mode !== "supabase") return toast("Email recovery is available after Supabase is connected.", "error");
-  if (hasRecoverableAccount()) return syncAccountProtectionUI();
-  const email = els.accountEmail.value.trim().toLowerCase();
-  if (!email || !els.accountEmail.checkValidity()) {
-    els.accountProtectionStatus.textContent = "Enter a valid email address.";
-    els.accountEmail.reportValidity();
-    return;
-  }
+  if (state.mode !== "supabase") return toast("Account protection is available after Supabase is connected.", "error");
+  if (hasPasswordLogin()) return syncAccountProtectionUI();
 
   const button = els.protectAccountButton;
   button.disabled = true;
   els.accountProtectionStatus.className = "account-protection-status";
-  els.accountProtectionStatus.textContent = "Sending your verification email…";
 
   try {
-    const { data, error } = await state.client.auth.updateUser(
-      { email },
-      { emailRedirectTo: authRedirectUrl() }
-    );
+    if (!hasVerifiedEmail()) {
+      const email = els.accountEmail.value.trim().toLowerCase();
+      if (!email || !els.accountEmail.checkValidity()) {
+        els.accountProtectionStatus.textContent = "Enter a valid email address.";
+        els.accountEmail.reportValidity();
+        button.disabled = false;
+        return;
+      }
+
+      els.accountProtectionStatus.textContent = "Sending your one-time verification email…";
+      const { data, error } = await state.client.auth.updateUser(
+        { email },
+        { emailRedirectTo: authRedirectUrl() }
+      );
+      if (error) throw error;
+      if (data?.user) state.user = data.user;
+      state.pendingProtectionEmail = email;
+      syncAccountProtectionUI(`Verification sent to ${email}. Open that email once and click the confirmation link. Then return here to create your password.`);
+      toast("Verification email sent. You only need this email step once.");
+      return;
+    }
+
+    const password = els.accountPassword.value;
+    const confirmation = els.accountPasswordConfirm.value;
+    if (password.length < 8) {
+      els.accountProtectionStatus.textContent = "Your password must contain at least 8 characters.";
+      els.accountPassword.focus();
+      button.disabled = false;
+      return;
+    }
+    if (password !== confirmation) {
+      els.accountProtectionStatus.textContent = "The two passwords do not match.";
+      els.accountPasswordConfirm.focus();
+      button.disabled = false;
+      return;
+    }
+
+    els.accountProtectionStatus.textContent = "Creating your password…";
+    const { data, error } = await state.client.auth.updateUser({
+      password,
+      data: {
+        ...(state.user?.user_metadata || {}),
+        password_login_enabled: true
+      }
+    });
     if (error) throw error;
     if (data?.user) state.user = data.user;
-    state.pendingProtectionEmail = email;
-    syncAccountProtectionUI(`Verification sent to ${email}. Open the email and click the confirmation link. Do not press “Leave this device” before confirming.`);
-    toast("Verification email sent. Your current contributions stay attached to this account.");
+    els.accountPassword.value = "";
+    els.accountPasswordConfirm.value = "";
+    syncAccountProtectionUI("Password created. Your account can now be restored using email and password without a sign-in email.");
+    toast("Password login is ready.");
   } catch (error) {
     button.disabled = false;
     els.accountProtectionStatus.textContent = error?.message || "Could not protect this account.";
@@ -1318,31 +1391,64 @@ async function protectCurrentAccount() {
 async function sendRecoveryLink() {
   if (state.mode !== "supabase") return;
   const email = els.recoveryEmail.value.trim().toLowerCase();
+  const password = els.recoveryPassword.value;
+
   if (!email || !els.recoveryEmail.checkValidity()) {
-    els.recoveryStatus.textContent = "Enter the email you previously protected your access with.";
+    els.recoveryStatus.textContent = "Enter the email connected to your original account.";
     els.recoveryEmail.reportValidity();
+    return;
+  }
+  if (!password) {
+    els.recoveryStatus.textContent = "Enter your password.";
+    els.recoveryPassword.focus();
     return;
   }
 
   const button = els.recoveryButton;
   button.disabled = true;
   els.recoveryStatus.className = "recovery-status";
-  els.recoveryStatus.textContent = "Sending a secure sign-in link…";
+  els.recoveryStatus.textContent = "Signing in…";
 
   try {
-    const { error } = await state.client.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo: authRedirectUrl()
-      }
-    });
+    const { data, error } = await state.client.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    if (!data?.user || !data?.session) throw new Error("The sign-in did not create a session.");
+    state.user = data.user;
+
+    if (!state.user.user_metadata?.password_login_enabled) {
+      const { data: updated } = await state.client.auth.updateUser({
+        data: {
+          ...(state.user.user_metadata || {}),
+          password_login_enabled: true
+        }
+      });
+      if (updated?.user) state.user = updated.user;
+    }
+
+    const { data: membership, error: membershipError } = await state.client.rpc("current_room_membership", { p_room_slug: config.ROOM_SLUG });
+    if (membershipError) throw membershipError;
+    const row = Array.isArray(membership) ? membership[0] : membership;
+
     els.recoveryStatus.className = "recovery-status success";
-    els.recoveryStatus.textContent = "Check your email and open the sign-in link. It will restore your original room account.";
+    if (!row) {
+      state.roomId = null;
+      state.member = null;
+      els.recoveryStatus.textContent = "Signed in successfully. This account has not joined the room yet, so enter your name and invitation code above.";
+      toast("Signed in. Enter the invitation code to join this account to the room.");
+      return;
+    }
+
+    state.roomId = row.room_id;
+    state.member = row;
+    await loadAllData();
+    subscribeRealtime();
+    els.recoveryPassword.value = "";
+    els.recoveryStatus.textContent = "Signed in. Restoring your original planning access…";
+    enterApp();
+    toast("Your original access was restored.");
   } catch (error) {
     els.recoveryStatus.className = "recovery-status error";
-    els.recoveryStatus.textContent = error?.message || "Could not send the sign-in link.";
+    els.recoveryStatus.textContent = error?.message || "The email or password was not accepted.";
     button.disabled = false;
   }
 }
@@ -1372,8 +1478,8 @@ async function updateProfile(event) {
 }
 async function leaveDevice() {
   const warning = hasRecoverableAccount()
-    ? "Sign out on this device? You can return later using your protected email account."
-    : "Remove this room from this device? This account is not protected with email, so you may permanently lose control of your existing contributions.";
+    ? "Sign out on this device? You can return later using your email and password."
+    : "Remove this room from this device? Password login is not ready, so you may permanently lose control of your existing contributions.";
   if (!confirm(warning)) return;
   if (state.mode === "demo") {
     localStorage.removeItem(`${demoPrefix}membership`);
