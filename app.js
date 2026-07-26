@@ -36,6 +36,10 @@ const state = {
   venues: [],
   communityItems: [],
   itemVotes: [],
+  eventSettings: null,
+  eventSettingsAvailable: true,
+  passwordRecoveryMode: false,
+  pendingActions: new Set(),
   notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS },
   notificationPanelOpen: false,
   view: "all",
@@ -49,7 +53,9 @@ const state = {
 const els = {
   loading: $("#loading-screen"), app: $("#app"), joinDialog: $("#join-dialog"), joinForm: $("#join-form"),
   joinName: $("#join-name"), joinCode: $("#join-code"), joinError: $("#join-error"), demoHint: $("#demo-hint"),
-  recoveryEmail: $("#recovery-email"), recoveryPassword: $("#recovery-password"), recoveryButton: $("#recovery-button"), recoveryStatus: $("#recovery-status"),
+  recoveryEmail: $("#recovery-email"), recoveryPassword: $("#recovery-password"), recoveryButton: $("#recovery-button"), recoveryStatus: $("#recovery-status"), forgotPasswordButton: $("#forgot-password-button"),
+  passwordResetDialog: $("#password-reset-dialog"), passwordResetForm: $("#password-reset-form"), resetPassword: $("#reset-password"), resetPasswordConfirm: $("#reset-password-confirm"), passwordResetStatus: $("#password-reset-status"),
+  eventSettingsDialog: $("#event-settings-dialog"), eventSettingsForm: $("#event-settings-form"), eventSettingsName: $("#event-settings-name"), eventSettingsDatetime: $("#event-settings-datetime"), eventSettingsLocation: $("#event-settings-location"), eventSettingsCountdown: $("#event-settings-countdown"), eventSettingsStatus: $("#event-settings-status"),
   itemDialog: $("#item-dialog"), itemDetail: $("#item-detail"), profileDialog: $("#profile-dialog"),
   profileForm: $("#profile-form"), profileName: $("#profile-name"), sidebar: $("#sidebar"), sidebarBackdrop: $("#sidebar-backdrop"),
   accountEmail: $("#account-email"), accountPassword: $("#account-password"), accountPasswordConfirm: $("#account-password-confirm"), accountPasswordFields: $("#account-password-fields"), accountProtectionCopy: $("#account-protection-copy"), protectAccountButton: $("#protect-account-button"), accountProtectionStatus: $("#account-protection-status"),
@@ -66,10 +72,11 @@ const els = {
   notificationPanel: $("#notification-panel"), notificationList: $("#notification-list")
 };
 
-function authRedirectUrl() {
+function authRedirectUrl(mode = "") {
   const url = new URL(window.location.href);
   url.hash = "";
   url.search = "";
+  if (mode) url.searchParams.set("auth", mode);
   return url.toString();
 }
 function hasVerifiedEmail() {
@@ -134,6 +141,64 @@ function promptAccountProtection() {
   }, 650);
 }
 
+function defaultEventSettings() {
+  return {
+    room_id: state.roomId,
+    event_title: String(config.EVENT_TITLE || "Aboudi & Yara's Birthday").trim(),
+    event_at: null,
+    event_location: "",
+    countdown_enabled: true,
+    updated_at: null,
+    updated_by: null
+  };
+}
+function effectiveEventSettings() {
+  return { ...defaultEventSettings(), ...(state.eventSettings || {}) };
+}
+function eventDate() {
+  const value = effectiveEventSettings().event_at;
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+function isMissingEventSettingsError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return ["42P01", "PGRST205"].includes(error?.code) || message.includes("event_settings") && (message.includes("does not exist") || message.includes("schema cache"));
+}
+function localDateTimeValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+}
+function acquireAction(key) {
+  if (state.pendingActions.has(key)) return false;
+  state.pendingActions.add(key);
+  return true;
+}
+function releaseAction(key) { state.pendingActions.delete(key); }
+function setButtonBusy(button, busy, busyLabel = "Working…") {
+  if (!button) return;
+  if (busy) {
+    if (!button.dataset.originalLabel) button.dataset.originalLabel = button.textContent;
+    button.disabled = true;
+    button.classList.add("is-loading");
+    button.innerHTML = `<span class="button-spinner" aria-hidden="true"></span><span>${escapeHtml(busyLabel)}</span>`;
+  } else {
+    button.disabled = false;
+    button.classList.remove("is-loading");
+    button.textContent = button.dataset.originalLabel || button.textContent;
+    delete button.dataset.originalLabel;
+  }
+}
+function cleanAuthUrl() {
+  const url = new URL(window.location.href);
+  url.hash = "";
+  url.searchParams.delete("auth");
+  history.replaceState({}, document.title, `${url.pathname}${url.search}`);
+}
+
 function money(value) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: config.CURRENCY || "USD", maximumFractionDigits: 2 }).format(Number(value || 0));
 }
@@ -195,12 +260,23 @@ function setConnection(label, kind = "") {
   els.connection.className = `connection-pill ${kind}`;
   $("span", els.connection).textContent = label;
 }
-function toast(message, kind = "") {
+function toast(message, kind = "success") {
+  const stack = $("#toast-stack");
+  if (!stack) return;
+  const normalizedKind = ["success", "error", "info"].includes(kind) ? kind : "success";
+  const icon = normalizedKind === "error" ? "!" : normalizedKind === "info" ? "i" : "✓";
   const node = document.createElement("div");
-  node.className = `toast ${kind}`;
-  node.textContent = message;
-  $("#toast-stack").appendChild(node);
-  window.setTimeout(() => node.remove(), 3300);
+  node.className = `toast ${normalizedKind}`;
+  node.setAttribute("role", normalizedKind === "error" ? "alert" : "status");
+  node.innerHTML = `<span class="toast-icon" aria-hidden="true">${icon}</span><span class="toast-message"></span><button class="toast-close" type="button" aria-label="Dismiss">×</button><span class="toast-progress" aria-hidden="true"></span>`;
+  $(".toast-message", node).textContent = message;
+  $(".toast-close", node).addEventListener("click", () => node.remove());
+  stack.appendChild(node);
+  requestAnimationFrame(() => node.classList.add("shown"));
+  window.setTimeout(() => {
+    node.classList.remove("shown");
+    window.setTimeout(() => node.remove(), 220);
+  }, normalizedKind === "error" ? 5200 : 3800);
 }
 function fail(error, fallback = "Something went wrong.") {
   console.error(error);
@@ -439,6 +515,14 @@ async function initialize() {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
 
+    state.client.auth.onAuthStateChange((event, session) => {
+      if (session?.user) state.user = session.user;
+      if (event === "PASSWORD_RECOVERY") {
+        state.passwordRecoveryMode = true;
+        window.setTimeout(openPasswordResetDialog, 120);
+      }
+    });
+
     let { data: sessionData } = await state.client.auth.getSession();
     if (!sessionData.session) {
       const { data, error } = await state.client.auth.signInAnonymously();
@@ -446,6 +530,9 @@ async function initialize() {
       state.user = data.user;
     } else {
       state.user = sessionData.session.user;
+    }
+    if (new URL(window.location.href).searchParams.get("auth") === "reset-password" && sessionData.session) {
+      state.passwordRecoveryMode = true;
     }
 
     const { data: membership, error } = await state.client.rpc("current_room_membership", { p_room_slug: config.ROOM_SLUG });
@@ -500,6 +587,8 @@ async function loadDemoData() {
   state.communityItems = demoRead("communityItems", []).map(row => ({ ...row, status: row.status || "pending", review_note: row.review_note || "" }));
   demoWrite("communityItems", state.communityItems);
   state.itemVotes = demoRead("itemVotes", []);
+  state.eventSettings = demoRead("eventSettings", defaultEventSettings());
+  state.eventSettingsAvailable = true;
   renderEverything();
 }
 
@@ -518,6 +607,7 @@ function enterApp() {
   setConnection(state.mode === "demo" ? "Demo mode" : "Live", state.mode === "demo" ? "offline" : "online");
   hideLoading();
   promptAccountProtection();
+  if (state.passwordRecoveryMode) window.setTimeout(openPasswordResetDialog, 180);
 }
 
 async function joinRoom(name, code) {
@@ -555,38 +645,59 @@ async function joinRoom(name, code) {
 async function loadAllData() {
   if (!state.roomId) return;
   setConnection("Syncing");
-  const [membersResult, claimsResult, purchasesResult, messagesResult, activityResult, venuesResult, communityItemsResult, itemVotesResult] = await Promise.all([
+  document.body.classList.add("is-syncing");
+  const [membersResult, claimsResult, purchasesResult, messagesResult, activityResult, venuesResult, communityItemsResult, itemVotesResult, eventSettingsResult] = await Promise.all([
     state.client.from("room_members").select("room_id,user_id,display_name,is_organizer,joined_at").eq("room_id", state.roomId).order("joined_at"),
     state.client.from("claims").select("*").eq("room_id", state.roomId).order("created_at"),
     state.client.from("purchases").select("*").eq("room_id", state.roomId),
     state.client.from("item_messages").select("*").eq("room_id", state.roomId).order("created_at"),
-    state.client.from("activity").select("*").eq("room_id", state.roomId).order("created_at", { ascending: false }).limit(30),
+    state.client.from("activity").select("*").eq("room_id", state.roomId).order("created_at", { ascending: false }).limit(60),
     state.client.from("venue_suggestions").select("*").eq("room_id", state.roomId).order("is_confirmed", { ascending: false }).order("created_at", { ascending: false }),
     state.client.from("item_suggestions").select("*").eq("room_id", state.roomId).order("created_at"),
-    state.client.from("item_votes").select("*").eq("room_id", state.roomId)
+    state.client.from("item_votes").select("*").eq("room_id", state.roomId),
+    state.client.from("event_settings").select("*").eq("room_id", state.roomId).maybeSingle()
   ]);
-  const error = [membersResult, claimsResult, purchasesResult, messagesResult, activityResult, venuesResult, communityItemsResult, itemVotesResult].find(result => result.error)?.error;
-  if (error) throw error;
-  state.members = membersResult.data || [];
-  state.claims = claimsResult.data || [];
-  state.purchases = purchasesResult.data || [];
-  state.messages = messagesResult.data || [];
-  state.activity = activityResult.data || [];
-  state.venues = venuesResult.data || [];
-  state.communityItems = communityItemsResult.data || [];
-  state.itemVotes = itemVotesResult.data || [];
-  renderEverything();
-  setConnection("Live", "online");
+  try {
+    const requiredResults = [membersResult, claimsResult, purchasesResult, messagesResult, activityResult, venuesResult, communityItemsResult, itemVotesResult];
+    const error = requiredResults.find(result => result.error)?.error;
+    if (error) throw error;
+    if (eventSettingsResult.error && !isMissingEventSettingsError(eventSettingsResult.error)) throw eventSettingsResult.error;
+    state.members = membersResult.data || [];
+    state.claims = claimsResult.data || [];
+    state.purchases = purchasesResult.data || [];
+    state.messages = messagesResult.data || [];
+    state.activity = activityResult.data || [];
+    state.venues = venuesResult.data || [];
+    state.communityItems = communityItemsResult.data || [];
+    state.itemVotes = itemVotesResult.data || [];
+    state.eventSettingsAvailable = !eventSettingsResult.error;
+    state.eventSettings = eventSettingsResult.data || defaultEventSettings();
+    renderEverything();
+    setConnection("Live", "online");
+  } finally {
+    document.body.classList.remove("is-syncing");
+  }
+}
+
+let realtimeReloadTimer = null;
+function scheduleRealtimeReload() {
+  window.clearTimeout(realtimeReloadTimer);
+  realtimeReloadTimer = window.setTimeout(async () => {
+    try { await loadAllData(); }
+    catch (error) { fail(error, "Realtime refresh failed."); }
+  }, 140);
 }
 
 function subscribeRealtime() {
   if (!state.client || !state.roomId) return;
   if (state.channel) state.client.removeChannel(state.channel);
   state.channel = state.client.channel(`birthday-room-${state.roomId}`);
-  for (const table of ["room_members", "claims", "purchases", "item_messages", "activity", "venue_suggestions", "item_suggestions", "item_votes"]) {
-    state.channel.on("postgres_changes", { event: "*", schema: "public", table, filter: `room_id=eq.${state.roomId}` }, async payload => {
+  const realtimeTables = ["room_members", "claims", "purchases", "item_messages", "activity", "venue_suggestions", "item_suggestions", "item_votes"];
+  if (state.eventSettingsAvailable) realtimeTables.push("event_settings");
+  for (const table of realtimeTables) {
+    state.channel.on("postgres_changes", { event: "*", schema: "public", table, filter: `room_id=eq.${state.roomId}` }, payload => {
       if (table === "activity" && payload.eventType === "INSERT" && payload.new) showBrowserAlert(payload.new);
-      try { await loadAllData(); } catch (error) { fail(error, "Realtime refresh failed."); }
+      scheduleRealtimeReload();
     });
   }
   state.channel.subscribe(status => {
@@ -607,6 +718,14 @@ function setMobileSidebar(open) {
   if (!shouldOpen) menuButton?.focus({ preventScroll: true });
 }
 
+function switchView(view) {
+  state.view = view;
+  $$(".nav-item").forEach(node => node.classList.toggle("active", node.dataset.view === view));
+  setMobileSidebar(false);
+  renderCurrentView();
+  window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+
 function bindStaticEvents() {
   els.joinForm.addEventListener("submit", async event => {
     event.preventDefault();
@@ -621,12 +740,7 @@ function bindStaticEvents() {
     finally { button.disabled = false; }
   });
 
-  $$(".nav-item").forEach(button => button.addEventListener("click", () => {
-    state.view = button.dataset.view;
-    $$(".nav-item").forEach(node => node.classList.toggle("active", node === button));
-    setMobileSidebar(false);
-    renderCurrentView();
-  }));
+  $$(".nav-item").forEach(button => button.addEventListener("click", () => switchView(button.dataset.view)));
 
   els.search.addEventListener("input", () => { state.query = els.search.value.trim().toLowerCase(); if (state.view !== "venue") renderBoard(); });
   els.sort.addEventListener("change", () => { state.sort = els.sort.value; if (state.view !== "venue") renderBoard(); });
@@ -638,9 +752,13 @@ function bindStaticEvents() {
   window.addEventListener("resize", () => {
     if (!window.matchMedia("(max-width: 820px)").matches) setMobileSidebar(false);
   });
-  $("#refresh-button").addEventListener("click", async () => {
+  $("#refresh-button").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    button.classList.add("refreshing");
+    button.disabled = true;
     try { state.mode === "demo" ? await loadDemoData() : await loadAllData(); toast("Board refreshed."); }
     catch (error) { fail(error); }
+    finally { button.classList.remove("refreshing"); button.disabled = false; }
   });
   $("#profile-button").addEventListener("click", openProfileDialog);
   $("#close-profile-dialog").addEventListener("click", () => els.profileDialog.close());
@@ -649,6 +767,15 @@ function bindStaticEvents() {
   els.profileForm.addEventListener("submit", updateProfile);
   els.protectAccountButton?.addEventListener("click", protectCurrentAccount);
   els.recoveryButton?.addEventListener("click", sendRecoveryLink);
+  els.forgotPasswordButton?.addEventListener("click", requestPasswordReset);
+  els.passwordResetForm?.addEventListener("submit", saveRecoveredPassword);
+  $("#close-password-reset-dialog")?.addEventListener("click", () => els.passwordResetDialog.close());
+  els.eventSettingsForm?.addEventListener("submit", saveEventSettings);
+  $("#close-event-settings-dialog")?.addEventListener("click", () => els.eventSettingsDialog.close());
+  $("#clear-event-date-button")?.addEventListener("click", () => { els.eventSettingsDatetime.value = ""; els.eventSettingsDatetime.focus(); });
+  [$("#hero-manage-event-button"), $("#dashboard-manage-event-button")].forEach(button => button?.addEventListener("click", openEventSettingsDialog));
+  $("#dashboard-review-ideas-button")?.addEventListener("click", () => switchView("ideas"));
+  $("#dashboard-review-venues-button")?.addEventListener("click", () => switchView("venue"));
   [els.recoveryEmail, els.recoveryPassword].forEach(input => input?.addEventListener("keydown", event => {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -712,24 +839,35 @@ function bindStaticEvents() {
 }
 
 function populateEventDetails() {
-  $("#event-title").textContent = config.EVENT_TITLE;
-  const date = new Date(config.EVENT_DATE);
-  const dateText = Number.isNaN(date.getTime()) ? "Date not set" : new Intl.DateTimeFormat("en-LB", { dateStyle: "full", timeStyle: "short" }).format(date);
-  $("#event-meta").textContent = `${dateText} · ${config.EVENT_LOCATION}`;
+  const settings = effectiveEventSettings();
+  const date = eventDate();
+  const confirmedVenue = confirmedVenueRow();
+  const location = String(settings.event_location || confirmedVenue?.name || "").trim();
+  const title = String(settings.event_title || config.EVENT_TITLE || "Aboudi & Yara's Birthday").trim();
+  const showCountdown = Boolean(date && settings.countdown_enabled);
+
+  $("#event-title").textContent = title;
+  $("#event-eyebrow").textContent = date ? "COUNTDOWN TO THE DOUBLE BIRTHDAY" : "DOUBLE BIRTHDAY PLANNING";
+  $("#event-meta").textContent = date
+    ? `${new Intl.DateTimeFormat("en-LB", { dateStyle: "full", timeStyle: "short" }).format(date)}${location ? ` · ${location}` : ""}`
+    : `Date to be announced${location ? ` · ${location}` : " · Location to be announced"}`;
+  $("#countdown").classList.toggle("hidden", !showCountdown);
+  $("#event-date-pending").classList.toggle("hidden", Boolean(date));
+  $("#hero-manage-event-button").classList.toggle("hidden", !state.member?.is_organizer);
   updateCountdown();
 }
 function formatCountdownValue(value) {
   return String(Math.max(0, Number(value || 0))).padStart(2, "0");
 }
 function updateCountdown() {
-  const distance = new Date(config.EVENT_DATE).getTime() - Date.now();
+  const date = eventDate();
+  if (!date || !effectiveEventSettings().countdown_enabled) return;
+  const distance = date.getTime() - Date.now();
   const remaining = Number.isFinite(distance) && distance > 0 ? distance : 0;
-
   const days = Math.floor(remaining / 86400000);
   const hours = Math.floor((remaining % 86400000) / 3600000);
   const minutes = Math.floor((remaining % 3600000) / 60000);
   const seconds = Math.floor((remaining % 60000) / 1000);
-
   $("#days-value").textContent = formatCountdownValue(days);
   $("#hours-value").textContent = formatCountdownValue(hours);
   $("#minutes-value").textContent = formatCountdownValue(minutes);
@@ -743,7 +881,13 @@ function syncProfileUI() {
   $("#profile-avatar").textContent = initials(name);
 }
 function renderEverything() {
-  syncProfileUI(); renderCountsAndStats(); renderCurrentView(); renderActivity(); renderNotificationCenter();
+  syncProfileUI();
+  populateEventDetails();
+  renderCountsAndStats();
+  renderDashboardInsights();
+  renderCurrentView();
+  renderActivity();
+  renderNotificationCenter();
   if (state.activeItemId && els.itemDialog.open) renderItemDetail(state.activeItemId);
 }
 function renderCurrentView() {
@@ -782,6 +926,120 @@ function renderCountsAndStats() {
   $("#responsibility-progress-note").textContent = openCount
     ? `${openCount} item${openCount === 1 ? " still needs" : "s still need"} someone responsible`
     : "Every item has someone responsible";
+}
+
+function renderDashboardInsights() {
+  const items = allItems();
+  const assigned = items.filter(item => claimsFor(item.id).length > 0 || isPurchased(item.id)).length;
+  const open = Math.max(0, items.length - assigned);
+  const completion = items.length ? Math.round((assigned / items.length) * 100) : 0;
+  const weekAgo = Date.now() - 7 * 86400000;
+  const weeklyActivity = state.activity.filter(row => new Date(row.created_at).getTime() >= weekAgo).length;
+  const pending = pendingSuggestions().length;
+  const missingDetails = Number(!eventDate()) + Number(!String(effectiveEventSettings().event_location || confirmedVenueRow()?.name || "").trim());
+
+  $("#insight-completion").textContent = `${completion}%`;
+  $("#insight-completion-copy").textContent = open ? `${open} item${open === 1 ? " still needs" : "s still need"} someone responsible.` : "Every item has someone responsible.";
+  $("#insight-weekly-activity").textContent = `${weeklyActivity} update${weeklyActivity === 1 ? "" : "s"}`;
+  $("#insight-weekly-copy").textContent = weeklyActivity ? "The group has been actively moving the plan forward." : "No changes have been recorded in the last seven days.";
+
+  let nextTitle = "Planning is on track";
+  let nextCopy = "Keep checking contributions and final purchases.";
+  if (!eventDate()) { nextTitle = "Set the event date"; nextCopy = "The date can stay unannounced until organizers are ready."; }
+  else if (!confirmedVenueRow() && !effectiveEventSettings().event_location) { nextTitle = "Choose the location"; nextCopy = "Compare venue suggestions or type a location in event settings."; }
+  else if (pending) { nextTitle = `Review ${pending} idea${pending === 1 ? "" : "s"}`; nextCopy = "Organizers can approve or decline the pending suggestions."; }
+  else if (open) { nextTitle = `Assign ${open} open item${open === 1 ? "" : "s"}`; nextCopy = "These items still need at least one person responsible."; }
+  $("#insight-next-decision").textContent = nextTitle;
+  $("#insight-next-copy").textContent = nextCopy;
+
+  const dashboard = $("#organizer-dashboard");
+  dashboard.classList.toggle("hidden", !state.member?.is_organizer);
+  if (state.member?.is_organizer) {
+    $("#organizer-pending-count").textContent = pending;
+    $("#organizer-open-count").textContent = open;
+    $("#organizer-setup-count").textContent = missingDetails;
+    const attention = pending + open + missingDetails;
+    $("#organizer-dashboard-summary").textContent = attention
+      ? `${attention} planning detail${attention === 1 ? " needs" : "s need"} attention. Use the shortcuts below to handle them.`
+      : "The event details and planning board are fully up to date.";
+  }
+}
+
+function openEventSettingsDialog() {
+  if (!state.member?.is_organizer) return toast("Only organizers can edit the event details.", "error");
+  const settings = effectiveEventSettings();
+  els.eventSettingsName.value = settings.event_title || config.EVENT_TITLE || "";
+  els.eventSettingsDatetime.value = localDateTimeValue(settings.event_at);
+  els.eventSettingsLocation.value = settings.event_location || confirmedVenueRow()?.name || "";
+  els.eventSettingsCountdown.checked = settings.countdown_enabled !== false;
+  els.eventSettingsStatus.textContent = state.eventSettingsAvailable || state.mode === "demo"
+    ? "You can leave the date empty and add it later."
+    : "Run the included Supabase SQL upgrade before saving shared event details.";
+  els.eventSettingsStatus.className = "form-status";
+  if (!els.eventSettingsDialog.open) els.eventSettingsDialog.showModal();
+}
+
+async function saveEventSettings(event) {
+  event.preventDefault();
+  if (!state.member?.is_organizer) return toast("Only organizers can edit event details.", "error");
+  const actionKey = "save-event-settings";
+  if (!acquireAction(actionKey)) return;
+  const button = $("#save-event-settings-button");
+  const title = els.eventSettingsName.value.trim();
+  const location = els.eventSettingsLocation.value.trim();
+  const dateValue = els.eventSettingsDatetime.value;
+  const parsedDate = dateValue ? new Date(dateValue) : null;
+  els.eventSettingsStatus.className = "form-status";
+  if (title.length < 2) {
+    els.eventSettingsStatus.textContent = "Enter an event title containing at least 2 characters.";
+    releaseAction(actionKey);
+    return;
+  }
+  if (dateValue && (!parsedDate || Number.isNaN(parsedDate.getTime()))) {
+    els.eventSettingsStatus.textContent = "Choose a valid date and time, or leave it empty.";
+    releaseAction(actionKey);
+    return;
+  }
+  setButtonBusy(button, true, "Saving…");
+  try {
+    const payload = {
+      room_id: state.roomId,
+      event_title: title,
+      event_at: parsedDate ? parsedDate.toISOString() : null,
+      event_location: location,
+      countdown_enabled: Boolean(els.eventSettingsCountdown.checked),
+      updated_by: state.user.id,
+      updated_at: new Date().toISOString()
+    };
+    if (state.mode === "demo") {
+      state.eventSettings = payload;
+      demoWrite("eventSettings", payload);
+      addDemoActivity("event_updated", null, parsedDate ? "updated the event date and details" : "updated the event details");
+      renderEverything();
+    } else {
+      if (!state.eventSettingsAvailable) throw new Error("The event settings database upgrade has not been installed yet. Run EVENT-SETTINGS-UPGRADE.sql in Supabase first.");
+      const { error } = await state.client.rpc("update_event_settings", {
+        p_room_id: state.roomId,
+        p_event_title: title,
+        p_event_at: parsedDate ? parsedDate.toISOString() : null,
+        p_event_location: location,
+        p_countdown_enabled: Boolean(els.eventSettingsCountdown.checked)
+      });
+      if (error) throw error;
+      await loadAllData();
+    }
+    els.eventSettingsStatus.className = "form-status success";
+    els.eventSettingsStatus.textContent = parsedDate ? "Event details saved." : "Saved. The date remains unannounced.";
+    toast(parsedDate ? "Event date and details updated." : "Event details saved. The date is still to be announced.");
+    window.setTimeout(() => els.eventSettingsDialog.close(), 450);
+  } catch (error) {
+    els.eventSettingsStatus.className = "form-status error";
+    els.eventSettingsStatus.textContent = error?.message || "Could not save the event details.";
+    fail(error, "Could not save event details.");
+  } finally {
+    setButtonBusy(button, false);
+    releaseAction(actionKey);
+  }
 }
 
 function filteredItems() {
@@ -976,6 +1234,8 @@ async function joinItem(itemId) {
   const item = itemById(itemId);
   if (!item || myClaim(itemId) || isPurchased(itemId)) return;
   if (claimsFor(itemId).length >= item.maxPeople) return toast("That item already has enough people.", "error");
+  const actionKey = `join-item:${itemId}`;
+  if (!acquireAction(actionKey)) return;
   try {
     if (state.mode === "demo") {
       state.claims.push({ id: uuid(), room_id: state.roomId, item_id: itemId, user_id: state.user.id, contribution: 0, note: "", created_at: new Date().toISOString() });
@@ -988,10 +1248,13 @@ async function joinItem(itemId) {
     }
     toast(`You joined ${item.name}.`);
   } catch (error) { fail(error, "Could not join the item."); }
+  finally { releaseAction(actionKey); }
 }
 async function leaveItem(itemId) {
   const claim = myClaim(itemId);
   if (!claim) return;
+  const actionKey = `leave-item:${itemId}`;
+  if (!acquireAction(actionKey)) return;
   try {
     if (state.mode === "demo") {
       state.claims = state.claims.filter(row => row.id !== claim.id);
@@ -1004,25 +1267,33 @@ async function leaveItem(itemId) {
     }
     toast(`You left ${itemById(itemId)?.name}.`);
   } catch (error) { fail(error, "Could not leave the item."); }
+  finally { releaseAction(actionKey); }
 }
 async function saveContribution(itemId, amount, note) {
   const claim = myClaim(itemId);
   if (!claim) return toast("Join this item before adding a contribution.", "error");
   const contribution = Math.max(0, Number(amount || 0));
+  const cleanNote = String(note || "").trim().slice(0, 180);
+  const actionKey = `contribution:${itemId}`;
+  if (!acquireAction(actionKey)) return;
   try {
     if (state.mode === "demo") {
-      claim.contribution = contribution; claim.note = note; claim.updated_at = new Date().toISOString();
+      claim.contribution = contribution; claim.note = cleanNote; claim.updated_at = new Date().toISOString();
       demoWrite("claims", state.claims); addDemoActivity("contribution", itemId, `updated a contribution to ${money(contribution)}`);
     } else {
-      const { error } = await state.client.from("claims").update({ contribution, note, updated_at: new Date().toISOString() }).eq("id", claim.id);
+      const { error } = await state.client.from("claims").update({ contribution, note: cleanNote, updated_at: new Date().toISOString() }).eq("id", claim.id);
       if (error) throw error;
       await loadAllData();
     }
     toast("Your contribution was saved.");
   } catch (error) { fail(error, "Could not save the contribution."); }
+  finally { releaseAction(actionKey); }
 }
 async function updatePurchaseStatus(itemId, status) {
   if (!myClaim(itemId)) return toast("Only someone sharing this item can update its status.", "error");
+  if (!["planning", "ordered", "purchased"].includes(status)) return toast("Choose a valid item status.", "error");
+  const actionKey = `purchase-status:${itemId}`;
+  if (!acquireAction(actionKey)) return;
   try {
     if (state.mode === "demo") {
       const row = purchaseFor(itemId);
@@ -1036,10 +1307,13 @@ async function updatePurchaseStatus(itemId, status) {
     }
     toast("Item status updated.");
   } catch (error) { fail(error, "Could not update the status."); }
+  finally { releaseAction(actionKey); }
 }
 async function sendMessage(itemId, message) {
-  const clean = message.trim();
+  const clean = String(message || "").trim().slice(0, 300);
   if (!clean) return;
+  const actionKey = `message:${itemId}`;
+  if (!acquireAction(actionKey)) return;
   try {
     if (state.mode === "demo") {
       state.messages.push({ id: uuid(), room_id: state.roomId, item_id: itemId, user_id: state.user.id, message: clean, created_at: new Date().toISOString() });
@@ -1051,6 +1325,7 @@ async function sendMessage(itemId, message) {
       await loadAllData();
     }
   } catch (error) { fail(error, "Could not send the message."); }
+  finally { releaseAction(actionKey); }
 }
 function addDemoActivity(action, itemId, detail) {
   state.activity.unshift({ id: uuid(), room_id: state.roomId, actor_id: state.user.id, action, item_id: itemId, detail, created_at: new Date().toISOString() });
@@ -1300,9 +1575,19 @@ async function suggestVenue(event){event.preventDefault();const button=$("button
 async function confirmVenue(venueId){if(!state.member?.is_organizer)return toast("Only the organizer can confirm the birthday place.","error");const venue=state.venues.find(r=>r.id===venueId);if(!venue||!confirm(`Confirm “${venue.name}” as the official birthday place?`))return;try{if(state.mode==="demo"){state.venues.forEach(r=>{r.is_confirmed=r.id===venueId;r.confirmed_by=r.id===venueId?state.user.id:null;r.confirmed_at=r.id===venueId?new Date().toISOString():null;r.updated_at=new Date().toISOString();});demoWrite("venues",state.venues);addDemoActivity("venue_confirmed",null,`confirmed the venue ${venue.name}`);}else{const{error}=await state.client.rpc("confirm_venue",{p_venue_id:venueId});if(error)throw error;await loadAllData();}toast("The official birthday place was updated.");}catch(error){fail(error,"Could not confirm this place.");}}
 async function deleteVenue(venueId){const venue=state.venues.find(r=>r.id===venueId);if(!venue||!confirm(`Remove the suggestion “${venue.name}”?`))return;try{if(state.mode==="demo"){state.venues=state.venues.filter(r=>r.id!==venueId);demoWrite("venues",state.venues);addDemoActivity("venue_removed",null,`removed the venue suggestion ${venue.name}`);}else{const{error}=await state.client.from("venue_suggestions").delete().eq("id",venueId);if(error)throw error;await loadAllData();}toast("Place suggestion removed.");}catch(error){fail(error,"Could not remove this suggestion.");}}
 
+function activityIcon(action = "") {
+  if (action === "member_joined") return "＋";
+  if (action.includes("venue")) return "⌖";
+  if (action.includes("item_") || action === "joined" || action === "left") return "◇";
+  if (action === "contribution") return "$";
+  if (action === "status") return "✓";
+  if (action === "message") return "·";
+  if (action === "event_updated") return "◷";
+  return "↗";
+}
 function renderActivity() {
   if (!state.activity.length) {
-    els.activity.innerHTML = `<div class="empty-state" style="border:0"><strong>No activity yet</strong>Joining an item or posting a message will appear here.</div>`;
+    els.activity.innerHTML = `<div class="empty-state activity-empty"><strong>No activity yet</strong>Joining an item, suggesting a venue, or posting a message will appear here.</div>`;
     return;
   }
   els.activity.innerHTML = state.activity.slice(0, 12).map(row => {
@@ -1310,7 +1595,8 @@ function renderActivity() {
     const suggestion = suggestionById(row.item_id);
     const subject = item?.name || suggestion?.name || "";
     const detail = row.item_id === VENUE_DISCUSSION_ID && row.detail === "posted a message" ? "posted in the venue discussion" : (row.detail || row.action);
-    return `<div class="activity-row"><span class="avatar">${initials(memberName(row.actor_id))}</span><p><strong>${escapeHtml(memberName(row.actor_id))}</strong> ${escapeHtml(detail)}${subject ? ` · <strong>${escapeHtml(subject)}</strong>` : ""}</p><time>${relativeTime(row.created_at)}</time></div>`;
+    const actor = memberName(row.actor_id);
+    return `<article class="activity-row"><span class="activity-action-icon" aria-hidden="true">${activityIcon(row.action)}</span><span class="avatar">${initials(actor)}</span><div class="activity-copy"><p><strong>${escapeHtml(actor)}</strong> ${escapeHtml(detail)}</p>${subject ? `<span>${escapeHtml(subject)}</span>` : ""}</div><time datetime="${escapeHtml(row.created_at)}">${relativeTime(row.created_at)}</time></article>`;
   }).join("");
 }
 function relativeTime(value) {
@@ -1319,6 +1605,85 @@ function relativeTime(value) {
   const units = [["year", 31536000], ["month", 2592000], ["day", 86400], ["hour", 3600], ["minute", 60]];
   for (const [unit, size] of units) if (Math.abs(seconds) >= size || unit === "minute") return formatter.format(Math.round(seconds / size), unit);
   return "now";
+}
+
+async function requestPasswordReset() {
+  if (state.mode !== "supabase") return toast("Password reset emails require Supabase.", "error");
+  const email = els.recoveryEmail.value.trim().toLowerCase();
+  if (!email || !els.recoveryEmail.checkValidity()) {
+    els.recoveryStatus.className = "recovery-status error";
+    els.recoveryStatus.textContent = "Enter your account email first, then press Forgot your password?";
+    els.recoveryEmail.reportValidity();
+    return;
+  }
+  const actionKey = `password-reset:${email}`;
+  if (!acquireAction(actionKey)) return;
+  setButtonBusy(els.forgotPasswordButton, true, "Sending…");
+  els.recoveryStatus.className = "recovery-status";
+  els.recoveryStatus.textContent = "Sending a secure password reset email…";
+  try {
+    const { error } = await state.client.auth.resetPasswordForEmail(email, { redirectTo: authRedirectUrl("reset-password") });
+    if (error) throw error;
+    els.recoveryStatus.className = "recovery-status success";
+    els.recoveryStatus.textContent = `Reset email sent to ${email}. Open the link, then choose a new password.`;
+    toast("Password reset email sent.");
+  } catch (error) {
+    els.recoveryStatus.className = "recovery-status error";
+    els.recoveryStatus.textContent = error?.message || "Could not send the password reset email.";
+    fail(error, "Could not send the password reset email.");
+  } finally {
+    setButtonBusy(els.forgotPasswordButton, false);
+    releaseAction(actionKey);
+  }
+}
+function openPasswordResetDialog() {
+  if (!els.passwordResetDialog || els.passwordResetDialog.open) return;
+  els.passwordResetStatus.textContent = "";
+  els.resetPassword.value = "";
+  els.resetPasswordConfirm.value = "";
+  els.passwordResetDialog.showModal();
+  window.setTimeout(() => els.resetPassword.focus(), 80);
+}
+async function saveRecoveredPassword(event) {
+  event.preventDefault();
+  if (!state.client || !state.user) return;
+  const password = els.resetPassword.value;
+  const confirmation = els.resetPasswordConfirm.value;
+  if (password.length < 8) {
+    els.passwordResetStatus.className = "form-status error";
+    els.passwordResetStatus.textContent = "The new password must contain at least 8 characters.";
+    return;
+  }
+  if (password !== confirmation) {
+    els.passwordResetStatus.className = "form-status error";
+    els.passwordResetStatus.textContent = "The two passwords do not match.";
+    return;
+  }
+  const actionKey = "save-recovered-password";
+  if (!acquireAction(actionKey)) return;
+  const button = $("#save-reset-password-button");
+  setButtonBusy(button, true, "Saving…");
+  try {
+    const { data, error } = await state.client.auth.updateUser({
+      password,
+      data: { ...(state.user.user_metadata || {}), password_login_enabled: true }
+    });
+    if (error) throw error;
+    if (data?.user) state.user = data.user;
+    state.passwordRecoveryMode = false;
+    cleanAuthUrl();
+    els.passwordResetStatus.className = "form-status success";
+    els.passwordResetStatus.textContent = "Password updated successfully.";
+    toast("Your new password is ready.");
+    window.setTimeout(() => els.passwordResetDialog.close(), 500);
+  } catch (error) {
+    els.passwordResetStatus.className = "form-status error";
+    els.passwordResetStatus.textContent = error?.message || "Could not update your password.";
+    fail(error, "Could not update your password.");
+  } finally {
+    setButtonBusy(button, false);
+    releaseAction(actionKey);
+  }
 }
 
 async function protectCurrentAccount() {
@@ -1405,7 +1770,9 @@ async function sendRecoveryLink() {
   }
 
   const button = els.recoveryButton;
-  button.disabled = true;
+  const actionKey = `sign-in:${email}`;
+  if (!acquireAction(actionKey)) return;
+  setButtonBusy(button, true, "Signing in…");
   els.recoveryStatus.className = "recovery-status";
   els.recoveryStatus.textContent = "Signing in…";
 
@@ -1449,7 +1816,9 @@ async function sendRecoveryLink() {
   } catch (error) {
     els.recoveryStatus.className = "recovery-status error";
     els.recoveryStatus.textContent = error?.message || "The email or password was not accepted.";
-    button.disabled = false;
+  } finally {
+    setButtonBusy(button, false);
+    releaseAction(actionKey);
   }
 }
 
