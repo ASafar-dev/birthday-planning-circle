@@ -36,23 +36,54 @@
       object-position: center;
       border-radius: 12px;
       background: #000;
-      box-shadow: none;
     }
 
     @keyframes loading-heart-pulse {
-      0%, 100% {
-        transform: scale(1);
-        opacity: 0.92;
-      }
-      50% {
-        transform: scale(1.045);
-        opacity: 1;
-      }
+      0%, 100% { transform: scale(1); opacity: 0.92; }
+      50% { transform: scale(1.045); opacity: 1; }
     }
-      50% {
-        transform: scale(1.06);
-        opacity: 1;
-      }
+
+    .access-recovery,
+    .account-protection {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid rgba(121, 240, 195, 0.22);
+      border-radius: 16px;
+      background: rgba(73, 185, 126, 0.07);
+    }
+
+    .access-recovery h2,
+    .account-protection h3 {
+      margin: 3px 0 6px;
+      font-size: 1.05rem;
+    }
+
+    .access-recovery p,
+    .account-protection p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .access-recovery .field,
+    .account-protection .field {
+      margin-bottom: 10px;
+    }
+
+    .recovery-status,
+    .account-protection-status {
+      min-height: 1.35em;
+      margin: 10px 0 0 !important;
+      font-size: 0.88rem;
+    }
+
+    .recovery-status.success,
+    .account-protection-status.success {
+      color: #8ff0b7;
+    }
+
+    .recovery-status.error {
+      color: #ff9a9a;
     }
   </style>
 </head>
@@ -90,6 +121,18 @@
       </button>
       <p id="join-error" class="form-error" role="alert"></p>
       <p id="demo-hint" class="demo-hint hidden">Demo mode code: <strong>DEMO</strong></p>
+
+      <section class="access-recovery" aria-labelledby="recovery-title">
+        <p class="eyebrow">ALREADY JOINED BEFORE?</p>
+        <h2 id="recovery-title">Restore your original access</h2>
+        <p>Use the email you connected to your account to recover your joined items, contributions, votes, and role.</p>
+        <label class="field">
+          <span>Your protected email</span>
+          <input id="recovery-email" type="email" autocomplete="email" placeholder="you@example.com">
+        </label>
+        <button id="recovery-button" class="button button-ghost button-wide" type="button">Email me a sign-in link</button>
+        <p id="recovery-status" class="recovery-status" role="status"></p>
+      </section>
     </form>
   </dialog>
 
@@ -109,6 +152,19 @@
         <span>Name shown to the group</span>
         <input id="profile-name" type="text" maxlength="40" required>
       </label>
+
+      <section class="account-protection" aria-labelledby="account-protection-title">
+        <p class="eyebrow">ACCOUNT RECOVERY</p>
+        <h3 id="account-protection-title">Protect your planning access</h3>
+        <p>Connect an email to this exact account so you can return from another browser without losing control of your contributions.</p>
+        <label class="field">
+          <span>Email address</span>
+          <input id="account-email" type="email" autocomplete="email" placeholder="you@example.com">
+        </label>
+        <button id="protect-account-button" class="button button-primary button-wide" type="button">Protect my access</button>
+        <p id="account-protection-status" class="account-protection-status" role="status"></p>
+      </section>
+
       <section class="notification-settings" aria-labelledby="notification-settings-title">
         <div class="notification-settings-heading">
           <div><p class="eyebrow">NOTIFICATIONS</p><h3 id="notification-settings-title">Updates on this device</h3></div>
@@ -433,6 +489,6 @@
     });
   </script>
   <script src="config.js?v=dual-bday-v17"></script>
-  <script type="module" src="app.js?v=dual-bday-v17"></script>
+  <script type="module" src="app.js?v=email-access-v1"></script>
 </body>
 </html>
