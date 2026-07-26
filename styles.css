@@ -348,11 +348,6 @@ body{color:var(--ink);background:radial-gradient(circle at 78% 4%,rgba(72,179,10
 .venue-view{display:grid;gap:28px}.venue-intro{display:flex;align-items:end;justify-content:space-between;gap:22px;padding:26px;border:1px solid var(--line);border-radius:var(--radius-lg);background:linear-gradient(110deg,rgba(120,244,154,.08),transparent 50%),var(--panel);box-shadow:var(--shadow)}.venue-intro h2{margin:5px 0 8px;font-family:"Fraunces",serif;font-size:clamp(1.8rem,3vw,2.6rem)}.venue-intro p:last-child{max-width:720px;margin:0;color:var(--muted);line-height:1.65}.organizer-note{display:flex;align-items:flex-start;gap:13px;padding:16px 18px;border:1px solid rgba(120,244,154,.25);border-radius:15px;color:var(--mint);background:rgba(120,244,154,.08)}.organizer-note>span{color:var(--green-bright)}.organizer-note p{margin:3px 0 0;color:var(--muted)}.confirmed-venue-empty{display:flex;align-items:center;gap:15px;min-height:135px;padding:24px;border:1px dashed rgba(120,244,154,.27);border-radius:19px;color:var(--muted);background:rgba(11,27,18,.56)}.confirmed-venue-empty strong{display:block;color:var(--ink)}.confirmed-icon,.venue-pin{display:grid;place-items:center;width:46px;height:46px;flex:0 0 auto;border-radius:14px;color:var(--green-bright);background:rgba(120,244,154,.1)}.confirmed-venue-card{overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.95fr);border:1px solid rgba(120,244,154,.24);border-radius:22px;background:linear-gradient(145deg,rgba(18,42,27,.96),rgba(8,22,14,.98));box-shadow:var(--glow)}.confirmed-venue-copy{padding:28px}.confirmed-kicker{display:flex;align-items:center;gap:8px;color:var(--green-bright);font-size:.75rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.confirmed-venue-copy h2{margin:12px 0 7px;font-family:"Fraunces",serif;font-size:clamp(2rem,4vw,3.1rem)}.confirmed-address,.venue-address{color:var(--cyan)}.confirmed-description,.venue-notes{color:var(--muted);line-height:1.65}.confirmed-metrics,.venue-metrics{display:grid;gap:9px}.confirmed-metrics{grid-template-columns:repeat(2,1fr);margin:22px 0}.confirmed-metrics div,.venue-metrics div{padding:12px;border-radius:12px;background:rgba(255,255,255,.04)}.confirmed-metrics span,.confirmed-metrics strong,.venue-metrics span,.venue-metrics strong{display:block}.confirmed-metrics span,.venue-metrics span{color:var(--muted);font-size:.7rem}.confirmed-metrics strong,.venue-metrics strong{margin-top:4px}.confirmed-links,.venue-actions{display:flex;flex-wrap:wrap;gap:9px}.map-frame{min-height:380px;background:#06100c}.map-frame iframe{width:100%;height:100%;min-height:380px;border:0;filter:grayscale(.68) invert(.92) hue-rotate(82deg) saturate(.55) contrast(.92)}.venue-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}.venue-card{display:flex;flex-direction:column;min-width:0;padding:21px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,rgba(17,34,25,.96),rgba(9,22,15,.96));box-shadow:0 12px 32px rgba(0,0,0,.17)}.venue-card.confirmed{border-color:rgba(120,244,154,.4);box-shadow:var(--glow)}.venue-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.venue-card h3{margin:10px 0 0;font-family:"Fraunces",serif;font-size:1.45rem}.venue-notes{min-height:46px}.venue-metrics{grid-template-columns:repeat(2,1fr);margin:10px 0 15px}.venue-byline{margin-top:auto;padding-top:10px;color:var(--muted);font-size:.78rem}.venue-actions{margin-top:15px}.venue-actions .button{flex:1 1 130px}.venue-dialog-copy{text-align:left;margin-top:8px}.venue-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}.field-span-2{grid-column:1/-1}.field span small{color:var(--muted);font-weight:500}
 @media(max-width:1120px){.event-hero{grid-template-columns:minmax(0,1.2fr) minmax(170px,.6fr)}.hero-art{grid-row:1/span 2;grid-column:2;min-height:220px}.countdown{grid-column:1}.event-progress{grid-column:1/-1}}@media(max-width:900px){.confirmed-venue-card{grid-template-columns:1fr}.map-frame,.map-frame iframe{min-height:310px}}@media(max-width:820px){.event-hero{grid-template-columns:1fr}.hero-art{grid-row:auto;grid-column:auto;min-height:250px}.countdown{grid-column:auto}.venue-intro{align-items:flex-start;flex-direction:column}.venue-grid{grid-template-columns:1fr}}@media(max-width:620px){.hero-art{min-height:210px}.hero-image-portrait{right:24%}.confirmed-metrics,.venue-metrics,.venue-form-grid{grid-template-columns:1fr}.field-span-2{grid-column:auto}.confirmed-venue-copy{padding:22px}}
 
-/* =========================================================
-   BOTANICAL ART DIRECTION — v4
-   The Alqest font is loaded from the user's installed fonts.
-   If it is not installed, Fraunces is used as a fallback.
-   ========================================================= */
 @font-face {
   font-family: "Alqest";
   src: local("Alqest Regular"), local("Alqest-Regular"), local("Alqest");
@@ -643,12 +638,6 @@ h1, h2, h3,
   body::before { background-size: 520px auto, 320px auto; }
 }
 
-
-/* =========================================================
-   GREEN CELEBRATION — v5 refinements
-   ========================================================= */
-
-/* Only the sign-up page uses the supplied animated GIF. */
 #join-dialog .join-brand-lockup {
   align-items: center;
   gap: 15px;
@@ -665,8 +654,6 @@ h1, h2, h3,
   background: #16dd4f;
   box-shadow: 0 12px 34px rgba(22, 221, 79, .22);
 }
-
-/* Remove decorative watermark-like marks while keeping the botanical leaves. */
 .event-hero::after,
 body::after,
 .section-heading h2::after,
@@ -708,8 +695,6 @@ body::after,
   }
 }
 
-
-/* Venue discussion — v6 */
 .sr-only {
   position: absolute !important;
   width: 1px !important;
@@ -764,10 +749,6 @@ body::after,
   .venue-messages .message { max-width: 94%; }
 }
 
-
-/* =========================================================
-   COMMUNITY IDEAS — v7
-   ========================================================= */
 .sidebar-logo {
   display: block;
   flex: 0 0 auto;
@@ -802,11 +783,6 @@ body::after,
 @media (max-width: 820px) { .item-suggestion-layout { grid-template-columns: 1fr; } .item-image-preview-wrap { position: static; } .item-image-preview { max-width: 320px; margin-inline: auto; } }
 @media (max-width: 620px) { .board-tool-actions { flex-direction: column; } .board-tool-actions .button, .board-tool-actions .select-control { width: 100%; } .item-form-grid { grid-template-columns: 1fr; gap: 0; } .community-detail-note { align-items: flex-start; flex-direction: column; } .idea-strip { align-items: flex-start; flex-direction: column; } }
 
-/* =========================================================
-   COMMUNITY REVIEW + NOTIFICATIONS — v8
-   ========================================================= */
-
-/* Keep the interface clean: no watermark-style text on community cards. */
 .community-item::after { content: none !important; display: none !important; }
 
 .notification-shell { position: relative; }
@@ -1010,9 +986,6 @@ body::after,
 #profile-dialog { max-height: min(90vh, 820px); }
 #profile-dialog .dialog-body { max-height: min(90vh, 820px); overflow-y: auto; }
 
-/* =========================================================
-   DASHBOARD STAT ICONS — fixed inline SVGs
-   ========================================================= */
 .stats-grid .stat-card .stat-icon {
   flex: 0 0 64px;
   width: 64px;
@@ -1055,12 +1028,6 @@ body::after,
     flex-basis: 25px;
   }
 }
-
-
-
-/* =========================================================
-   IMPORTANT ITEMS NOTICE — v9
-   ========================================================= */
 .items-important-notice {
   position: relative;
   overflow: hidden;
@@ -1137,10 +1104,6 @@ body::after,
   }
 }
 
-/* =========================================================
-   STICKY SIDEBAR + MOBILE BROWSER SUPPORT — v10
-   ========================================================= */
-
 html,
 body {
   max-width: 100%;
@@ -1153,8 +1116,6 @@ body {
   align-items: start;
 }
 
-/* Keep the desktop navigation attached to the viewport instead of
-   scrolling away and leaving a blank column beneath it. */
 .sidebar {
   position: sticky !important;
   top: 0;
@@ -1524,11 +1485,6 @@ iframe {
 }
 
 
-
-/* =========================================================
-   DUAL BIRTHDAY — YARA + ABOUDI v11
-   Blue/green split theme and hero collage.
-   ========================================================= */
 :root {
   --bg:#03060d;
   --bg-deep:#010308;
@@ -1779,12 +1735,6 @@ body::before {
   }
 }
 
-
-/* =========================================================
-   DUAL BIRTHDAY v12 — full-site blue/green aesthetic + new GIF logo
-   ========================================================= */
-
-/* make the same GIF remain visible after sign-in in the sidebar */
 .sidebar-logo,
 #join-dialog .join-logo {
   width: 78px !important;
@@ -1798,7 +1748,6 @@ body::before {
 
 .sidebar-logo { width: 48px !important; height: 48px !important; }
 
-/* loading screen and join page should match the joint birthday look too */
 .loading-screen {
   background:
     linear-gradient(90deg, rgba(3,15,10,.96) 0 50%, rgba(3,9,22,.96) 50% 100%),
@@ -1885,7 +1834,6 @@ body::before {
   border-color: rgba(111,224,255,.18) !important;
 }
 
-/* subtle split accent through headers and panels */
 .topbar,
 .sidebar,
 .notification-panel,
@@ -1921,10 +1869,6 @@ body::before {
   .sidebar-logo { width: 42px !important; height: 42px !important; }
 }
 
-
-/* =========================================================
-   v13 — verified 141-frame looping blue/green butterfly GIF
-   ========================================================= */
 #join-dialog .join-logo,
 .sidebar-logo {
   display: block !important;
@@ -1984,9 +1928,6 @@ body::before {
 }
 
 
-/* =========================================================
-   v14 — simplified ideas and updated default artwork
-   ========================================================= */
 .item-image-preview {
   border-radius: 24px !important;
   transform: none !important;
@@ -2003,9 +1944,6 @@ body::before {
 }
 
 
-/* =========================================================
-   FLIP COUNTDOWN — dual birthday v15
-   ========================================================= */
 .flip-countdown {
   display: grid !important;
   grid-template-columns: repeat(4, minmax(92px, 1fr)) !important;
@@ -2155,10 +2093,6 @@ body::before {
 }
 
 
-/* =========================================================
-   SIMPLE BLUE COUNTDOWN — dual birthday v16
-   Replaces the flip timer and keeps seconds visible.
-   ========================================================= */
 .event-hero {
   grid-template-columns: minmax(0, 1.12fr) minmax(310px, .92fr) minmax(260px, .76fr) !important;
 }
@@ -2229,7 +2163,6 @@ body::before {
   text-transform: uppercase;
 }
 
-/* Neutralize every style from the removed paper-flip timer. */
 .simple-countdown .flip-card,
 .simple-countdown .flip-card-top,
 .simple-countdown .flip-card-bottom,
@@ -2283,10 +2216,7 @@ body::before {
 }
 
 
-/* =========================================================
-   v17 visual cleanup — black panels with blue/green glow
-   Keeps the forest background, removes the harsh split across UI.
-   ========================================================= */
+
 :root {
   --panel:#071016 !important;
   --panel-2:#09131b !important;
@@ -2300,7 +2230,6 @@ body::before {
   --success:#79f0c3 !important;
 }
 
-/* keep the page background, but stop painting the inside of everything half green / half blue */
 .topbar::before,
 .sidebar::before,
 .item-card::after,
@@ -2394,7 +2323,6 @@ body::before {
   backdrop-filter: blur(10px) saturate(1.05);
 }
 
-/* subtle accent instead of split fill */
 .nav-item.active,
 .profile-button:hover,
 .nav-item:hover,
@@ -2426,7 +2354,6 @@ body::before {
 }
 .progress-track { background: rgba(255,255,255,.08) !important; }
 
-/* headers and empty states */
 .eyebrow,
 .confirmed-kicker,
 .idea-status.approved,
@@ -2447,7 +2374,6 @@ body::before {
   background: rgba(105,214,255,.10) !important;
 }
 
-/* simplify intro cards */
 .ideas-intro,
 .venue-intro,
 .confirmed-venue-empty,
@@ -2465,16 +2391,11 @@ body::before {
   box-shadow: 0 16px 34px rgba(5,17,45,.34), inset 0 1px 0 rgba(255,255,255,.05) !important;
 }
 
-/* soften hero art block background */
 .hero-image {
   background: #08111a !important;
   border-color: rgba(184, 245, 255, .14) !important;
 }
 
-/* =========================================================
-   Complete dashboard update — account recovery, organizer
-   event controls, mobile polish, activity cards and feedback.
-   ========================================================= */
 .recovery-help-row { display:flex; justify-content:flex-end; margin-top:10px; }
 .recovery-link { padding:6px 2px !important; background:transparent !important; border:0; font-size:.8rem; }
 .reset-dialog-copy, .event-settings-copy { text-align:left; margin:14px 0 18px; }
