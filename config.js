@@ -42,7 +42,7 @@ window.BIRTHDAY_ITEMS = [
     image: "assets/items/smores.webp",
     imageAlt: "Yummy S'more",
     description: "Marshmallows, chocolate, and biscuits(Specify which you are getting as a note)",
-    budget: 120,
+    budget: 0,
     maxPeople: 11,
     shared: true,
     priority: 5
@@ -53,7 +53,7 @@ window.BIRTHDAY_ITEMS = [
     image: "assets/items/drinks.webp",
     imageAlt: "A green party drink held against a dark background",
     description: "Vodka, whiskey, a few red wine bottles, and other drinks of choice + mixers and ice(Specify which you are getting as a note)",
-    budget: 45,
+    budget: 0,
     maxPeople: 11,
     shared: true,
     priority: 6
