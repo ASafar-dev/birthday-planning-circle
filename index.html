@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07110d">
+  <meta name="description" content="A private collaborative birthday planning board.">
+  <title>Birthday Circle — Mobile Friendly v10</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,650;9..144,750&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=dual-bday-v17">
+</head>
+<body>
+  <div id="loading-screen" class="loading-screen">
+    <div class="loading-mark">✦</div>
+    <strong>Opening the planning room…</strong>
+  </div>
+
+  <dialog id="join-dialog" class="dialog dialog-small" aria-labelledby="join-title">
+    <form id="join-form" class="dialog-body">
+      <div class="brand-lockup centered join-brand-lockup">
+        <img class="join-logo" src="assets/decor/blue-green-butterfly-logo.gif?v=13" alt="Looping blue and green butterfly animation">
+        <div>
+          <p class="eyebrow">PRIVATE PLANNING ROOM</p>
+          <h1 id="join-title">Join the Planning of Our Joint Birthday</h1>
+        </div>
+      </div>
+      <p class="dialog-copy">Enter your name and the private code shared by the organizers.</p>
+      <label class="field">
+        <span>Your name</span>
+        <input id="join-name" name="name" type="text" maxlength="40" autocomplete="name" placeholder="Recognizable Name/Nickname" required>
+      </label>
+      <label class="field">
+        <span>Invitation code</span>
+        <input id="join-code" name="code" type="password" maxlength="80" autocomplete="one-time-code" placeholder="Enter the private code" required>
+      </label>
+      <button class="button button-primary button-wide" type="submit">
+        <span>Enter the room</span><span aria-hidden="true">→</span>
+      </button>
+      <p id="join-error" class="form-error" role="alert"></p>
+      <p id="demo-hint" class="demo-hint hidden">Demo mode code: <strong>DEMO</strong></p>
+    </form>
+  </dialog>
+
+  <dialog id="item-dialog" class="dialog dialog-large" aria-labelledby="detail-title">
+    <div class="dialog-body detail-dialog-body">
+      <button id="close-item-dialog" class="icon-button dialog-close" type="button" aria-label="Close">×</button>
+      <div id="item-detail"></div>
+    </div>
+  </dialog>
+
+  <dialog id="profile-dialog" class="dialog dialog-small" aria-labelledby="profile-title">
+    <form id="profile-form" class="dialog-body">
+      <button id="close-profile-dialog" class="icon-button dialog-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">YOUR PROFILE</p>
+      <h2 id="profile-title">Change display name</h2>
+      <label class="field">
+        <span>Name shown to the group</span>
+        <input id="profile-name" type="text" maxlength="40" required>
+      </label>
+      <section class="notification-settings" aria-labelledby="notification-settings-title">
+        <div class="notification-settings-heading">
+          <div><p class="eyebrow">NOTIFICATIONS</p><h3 id="notification-settings-title">Updates on this device</h3></div>
+          <span class="notification-settings-icon" aria-hidden="true">◌</span>
+        </div>
+        <label class="toggle-row">
+          <input id="notifications-enabled" type="checkbox">
+          <span><strong>Unread update badge</strong><small>Keep a count of new activity in the bell menu.</small></span>
+        </label>
+        <label class="toggle-row">
+          <input id="browser-notifications-enabled" type="checkbox">
+          <span><strong>Browser alerts</strong><small>Show alerts while this website is open, even in another tab.</small></span>
+        </label>
+        <div class="notification-topic-grid" aria-label="Notification topics">
+          <label><input id="notify-ideas" type="checkbox"> Ideas and decisions</label>
+          <label><input id="notify-venues" type="checkbox"> Venue updates</label>
+          <label><input id="notify-items" type="checkbox"> Item progress</label>
+          <label><input id="notify-messages" type="checkbox"> Discussions</label>
+        </div>
+        <p id="browser-notification-note" class="notification-note">These choices are saved separately on each person’s device.</p>
+      </section>
+      <button class="button button-primary button-wide" type="submit">Save profile and alerts</button>
+      <button id="leave-room-button" class="button button-danger button-wide" type="button">Leave this device</button>
+    </form>
+  </dialog>
+
+  <dialog id="venue-dialog" class="dialog dialog-large" aria-labelledby="venue-dialog-title">
+    <form id="venue-form" class="dialog-body">
+      <button id="close-venue-dialog" class="icon-button dialog-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">PLACE SUGGESTION</p>
+      <h2 id="venue-dialog-title">Suggest a birthday place</h2>
+      <p class="dialog-copy venue-dialog-copy">Add the rental details you found. The organizers can compare suggestions and confirm the final place.</p>
+      <div class="venue-form-grid">
+        <label class="field field-span-2"><span>Place name</span><input id="venue-name" type="text" maxlength="100" placeholder="e.g. Adele Guesthouse in Batroun or something" required></label>
+        <label class="field field-span-2"><span>Address or area</span><input id="venue-address" type="text" maxlength="240" placeholder="Area, town, or full address" required></label>
+        <label class="field field-span-2"><span>Google Maps link <small>(optional)</small></span><input id="venue-maps-url" type="url" maxlength="1000" placeholder="https://maps.google.com/…"></label>
+        <label class="field field-span-2"><span>Airbnb or rental link <small>(optional)</small></span><input id="venue-airbnb-url" type="url" maxlength="1000" placeholder="https://www.airbnb.com/rooms/…"></label>
+        <label class="field"><span>Total price</span><input id="venue-price" type="number" min="0" step="0.01" value="0" required></label>
+        <label class="field"><span>Number of nights</span><input id="venue-nights" type="number" min="1" max="30" step="1" value="1" required></label>
+        <label class="field"><span>Maximum guests</span><input id="venue-capacity" type="number" min="1" max="500" step="1" value="10" required></label>
+        <label class="field field-span-2"><span>Why this place / important details</span><textarea id="venue-notes" maxlength="600" rows="4" placeholder="Bedrooms, pool, check-in time, transport, rules, deposit…"></textarea></label>
+      </div>
+      <p id="venue-form-error" class="form-error" role="alert"></p>
+      <button class="button button-primary button-wide" type="submit">Share this place</button>
+    </form>
+  </dialog>
+
+  <dialog id="item-suggestion-dialog" class="dialog dialog-large" aria-labelledby="item-suggestion-title">
+    <form id="item-suggestion-form" class="dialog-body">
+      <button id="close-item-suggestion-dialog" class="icon-button dialog-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">NEW PARTY IDEA</p>
+      <h2 id="item-suggestion-title">Suggest something for the birthday</h2>
+      <p class="dialog-copy item-suggestion-copy">Suggest whatever as idea and add a photo if you want. Everyone can support it, but only the organizers can approve it for the official planning list.</p>
+      <div class="item-suggestion-layout">
+        <div class="item-suggestion-fields">
+          <label class="field"><span>Item name</span><input id="suggested-item-name" type="text" maxlength="100" placeholder="e.g. Pizzas from Pizzanini" required></label>
+          <label class="field"><span>What is the idea?</span><textarea id="suggested-item-description" maxlength="500" rows="4" placeholder="Explain what people should bring, buy, make, or organize." required></textarea></label>
+          <div class="item-form-grid">
+            <label class="field"><span>Estimated budget <small>(optional)</small></span><input id="suggested-item-budget" type="number" min="0" step="0.01" value="0"></label>
+            <label class="field"><span>People needed</span><input id="suggested-item-people" type="number" min="1" max="100" step="1" value="3" required></label>
+          </div>
+          <label class="field"><span>Photo from your device <small>(PNG, JPG, WebP, or GIF)</small></span><input id="suggested-item-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+          <label class="field"><span>Or paste an image link <small>(optional)</small></span><input id="suggested-item-image-url" type="url" maxlength="1200" placeholder="https://…"></label>
+        </div>
+        <div class="item-image-preview-wrap">
+          <figure id="item-image-preview" class="item-image-preview"><img src="assets/theme/idea-default.png" alt="Blue and green figures used as the default idea preview"></figure>
+          <p>Uploaded photos are resized before being shared. Animated GIFs stay animated.</p>
+        </div>
+      </div>
+      <p id="item-suggestion-error" class="form-error" role="alert"></p>
+      <button class="button button-primary button-wide" type="submit">Send idea for review</button>
+    </form>
+  </dialog>
+
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar">
+      <div>
+        <div class="brand-lockup sidebar-brand">
+          <img class="sidebar-logo" src="assets/decor/blue-green-butterfly-logo.gif?v=13" alt="Looping blue and green butterfly animation">
+          <div>
+            <strong>Birthday Circle</strong>
+            <small>Secret planning board</small>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Board views">
+          <button class="nav-item active" data-view="all" type="button"><span>⌂</span><span>Everything</span><b id="count-all">0</b></button>
+          <button class="nav-item" data-view="mine" type="button"><span>♡</span><span>My items</span><b id="count-mine">0</b></button>
+          <button class="nav-item" data-view="available" type="button"><span>＋</span><span>Available</span><b id="count-available">0</b></button>
+          <button class="nav-item" data-view="purchased" type="button"><span>✓</span><span>Purchased</span><b id="count-purchased">0</b></button>
+          <button class="nav-item" data-view="ideas" type="button"><span>◇</span><span>Ideas</span><b id="count-ideas">0</b></button>
+          <button class="nav-item" data-view="venue" type="button"><span>⌖</span><span>Venue</span><b id="count-venues">0</b></button>
+        </nav>
+
+      </div>
+
+      <div class="sidebar-footer">
+        <button id="profile-button" class="profile-button" type="button">
+          <span id="profile-avatar" class="avatar">?</span>
+          <span><strong id="profile-display-name">Guest</strong><small id="profile-role">Guest planner</small></span>
+          <span>•••</span>
+        </button>
+      </div>
+    </aside>
+    <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation menu" tabindex="-1"></button>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button id="menu-button" class="icon-button mobile-only" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">☰</button>
+        <div class="topbar-title">
+          <p class="eyebrow">BIRTHDAY PLANNING</p>
+          <h1 id="page-heading">Everything</h1>
+        </div>
+        <div class="topbar-actions">
+          <span id="connection-pill" class="connection-pill"><i></i><span>Connecting</span></span>
+          <div class="notification-shell">
+            <button id="notification-button" class="icon-button notification-button" type="button" title="Updates" aria-label="Open notifications" aria-expanded="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span id="notification-badge" class="notification-badge hidden">0</span>
+            </button>
+            <aside id="notification-panel" class="notification-panel hidden" aria-label="Recent notifications">
+              <div class="notification-panel-head"><div><p class="eyebrow">UPDATES</p><h2>What changed</h2></div><button id="mark-notifications-read" class="text-button" type="button">Mark read</button></div>
+              <div id="notification-list" class="notification-list"></div>
+              <button id="open-notification-settings" class="notification-settings-link" type="button">Notification settings</button>
+            </aside>
+          </div>
+          <button id="refresh-button" class="icon-button" type="button" title="Refresh board" aria-label="Refresh">↻</button>
+        </div>
+      </header>
+
+      <section class="content-wrap">
+        <div id="mode-banner" class="mode-banner hidden">
+          <strong>Demo mode:</strong> changes are only shared between tabs in this browser. Connect Supabase for real multi-person use.
+        </div>
+
+        <section class="event-hero">
+          <div class="event-copy">
+            <p class="eyebrow light">COUNTDOWN TO THE DOUBLE BIRTHDAY</p>
+            <h2 id="event-title">Her Birthday</h2>
+            <p id="event-meta">Date and location</p>
+          </div>
+          <div class="hero-art dual-theme-art" aria-label="Blue and green joint birthday moodboard">
+            <figure class="hero-image hero-image-rain"><img src="assets/theme/glow-rain.png" alt="Blue and green glowing abstract lights"></figure>
+            <figure class="hero-image hero-image-blue-forest"><img src="assets/theme/forest-blue.png" alt="Blue moonlit forest"></figure>
+            <figure class="hero-image hero-image-green-forest"><img src="assets/theme/forest-green.png" alt="Green moonlit forest"></figure>
+            <figure class="hero-image hero-image-heart"><img src="assets/theme/heart.png" alt="Half green and half blue glowing heart"></figure>
+            <figure class="hero-image hero-image-friends"><img src="assets/theme/friends.png" alt="Two glowing figures in blue and green"></figure>
+          </div>
+          <div id="countdown" class="countdown simple-countdown" aria-label="Countdown">
+            <div class="countdown-unit">
+              <strong id="days-value">--</strong>
+              <span>Days</span>
+            </div>
+            <div class="countdown-unit">
+              <strong id="hours-value">--</strong>
+              <span>Hours</span>
+            </div>
+            <div class="countdown-unit">
+              <strong id="minutes-value">--</strong>
+              <span>Minutes</span>
+            </div>
+            <div class="countdown-unit">
+              <strong id="seconds-value">--</strong>
+              <span>Seconds</span>
+            </div>
+          </div>
+          <div class="event-progress responsibility-progress">
+            <div class="event-progress-label"><span>Items with someone responsible</span><strong id="responsibility-progress-text">0 of 0</strong></div>
+            <div class="progress-track large" aria-hidden="true"><div id="responsibility-progress-bar" class="progress-fill"></div></div>
+            <small id="responsibility-progress-note">No items assigned yet</small>
+          </div>
+        </section>
+
+        <div id="planning-view">
+        <section class="stats-grid" aria-label="Planning totals">
+          <article class="stat-card"><span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg></span><div><strong id="stat-items">0</strong><span>Total items</span></div></article>
+          <article class="stat-card"><span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span><div><strong id="stat-people">0</strong><span>People joined</span></div></article>
+          <article class="stat-card"><span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"></ellipse><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"></path><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"></path></svg></span><div><strong id="stat-funded">$0</strong><span>Contributed</span></div></article>
+          <article class="stat-card"><span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.7 2.7L16.5 9"></path></svg></span><div><strong id="stat-complete">0</strong><span>Purchased</span></div></article>
+        </section>
+
+        <section id="drop-zone" class="drop-zone" aria-label="Drop an item here to join">
+          <div class="drop-icon">＋</div>
+          <div><strong>Drag an available item here to join it</strong><span>You can also use the Join button on any card.</span></div>
+        </section>
+
+        <section class="board-tools">
+          <label class="search-box">
+            <span>⌕</span>
+            <input id="search-input" type="search" placeholder="Search items or details…">
+          </label>
+          <div class="board-tool-actions">
+            <button id="suggest-item-button" class="button button-primary" type="button"><span>＋</span> Suggest an idea</button>
+            <select id="sort-select" class="select-control" aria-label="Sort items">
+              <option value="recommended">Sort: Recommended</option>
+              <option value="support">Most supported ideas</option>
+              <option value="price-high">Highest budget</option>
+              <option value="price-low">Lowest budget</option>
+              <option value="people">Most people joined</option>
+              <option value="progress">Most active</option>
+            </select>
+          </div>
+        </section>
+
+        <aside class="items-important-notice" role="note" aria-label="Important item reminder">
+          <span class="items-notice-mark" aria-hidden="true">!</span>
+          <div>
+            <p class="items-notice-label">Important for the charcuterie board</p>
+            <p>I’d really appreciate it if everyone could bring <strong>one type of cheese and one type of meat</strong>. Please choose different varieties where possible so we have a good mix.</p>
+          </div>
+        </aside>
+
+        <section>
+          <div class="section-heading">
+            <div><p class="eyebrow">PLANNING LIST</p><h2 id="result-heading">Birthday items</h2></div>
+            <span id="result-count" class="result-count">0 items</span>
+          </div>
+          <div id="items-grid" class="items-grid" aria-live="polite"></div>
+        </section>
+
+        <section class="activity-section">
+          <div class="section-heading">
+            <div><p class="eyebrow">RECENT ACTIVITY</p><h2>Recent updates</h2></div>
+          </div>
+          <div id="activity-list" class="activity-list"></div>
+        </section>
+        </div>
+
+        <section id="ideas-view" class="ideas-view hidden">
+          <div class="ideas-intro">
+            <div><p class="eyebrow">PARTY IDEAS</p><h2>Everyone can suggest and eventually the organizers makes the final call.</h2><p>Share an idea, add a picture, and let the group show support. Pending ideas do not become assignable party items until the organizers approve them.</p></div>
+            <button id="suggest-item-button-ideas" class="button button-primary" type="button"><span>＋</span> Suggest an idea</button>
+          </div>
+          <div id="organizer-ideas-note" class="organizer-note hidden"><span>◆</span><div><strong>You have final approval</strong><p>Review the support and details, then approve an idea to add it to the planning board or decline it.</p></div></div>
+          <section class="ideas-section">
+            <div class="section-heading"><div><p class="eyebrow">AWAITING DECISION</p><h2>Ideas under review</h2></div><span id="pending-ideas-count" class="result-count">0 ideas</span></div>
+            <div id="pending-ideas" class="ideas-grid"></div>
+          </section>
+          <section class="ideas-section">
+            <div class="section-heading"><div><p class="eyebrow">DECISION HISTORY</p><h2>Approved and declined</h2></div><span id="reviewed-ideas-count" class="result-count">0 decisions</span></div>
+            <div id="reviewed-ideas" class="ideas-history"></div>
+          </section>
+        </section>
+
+        <section id="venue-view" class="venue-view hidden">
+          <div class="venue-intro">
+            <div><p class="eyebrow">RENTAL & LOCATION</p><h2>Choose the birthday place together</h2><p>Guests can share Airbnb listings or other rentals, include the total price and map location, and compare every option in one place.</p></div>
+            <button id="suggest-venue-button" class="button button-primary" type="button"><span>＋</span> Suggest a place</button>
+          </div>
+          <div id="organizer-venue-note" class="organizer-note hidden"><span>◆</span><div><strong>Organizer controls enabled</strong><p>You can confirm one suggestion as the official birthday place. Confirming another option automatically replaces the previous one.</p></div></div>
+          <section><div class="section-heading"><div><p class="eyebrow">OFFICIAL LOCATION</p><h2>Confirmed place</h2></div></div><div id="confirmed-venue"></div></section>
+          <section class="venue-suggestions-section"><div class="section-heading"><div><p class="eyebrow">PLACE SUGGESTIONS</p><h2>Places being considered</h2></div><span id="venue-result-count" class="result-count">0 suggestions</span></div><div id="venue-suggestions" class="venue-grid"></div></section>
+          <section class="venue-discussion-section" aria-labelledby="venue-discussion-title">
+            <div class="section-heading venue-discussion-heading">
+              <div><p class="eyebrow">VENUE CHAT</p><h2 id="venue-discussion-title">Discuss the options together</h2></div>
+              <span id="venue-message-count" class="result-count">0 messages</span>
+            </div>
+            <div class="venue-discussion-panel">
+              <div id="venue-messages" class="messages venue-messages" aria-live="polite"></div>
+              <form id="venue-message-form" class="message-form venue-message-form">
+                <label class="sr-only" for="venue-message-input">Message for the venue discussion</label>
+                <input id="venue-message-input" maxlength="300" autocomplete="off" placeholder="Share thoughts about prices, transport, dates, or which place you prefer…" required>
+                <button class="button button-primary" type="submit">Send</button>
+              </form>
+              <p class="venue-chat-note">Everyone in the planning room can read and reply here.</p>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <canvas id="confetti-canvas" class="confetti-canvas" aria-hidden="true"></canvas>
+  <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
+
+  <template id="item-card-template">
+    <article class="item-card" tabindex="0">
+      <div class="card-head">
+        <figure class="item-photo"><img class="item-photo-img" src="" alt="" loading="lazy" decoding="async"></figure>
+        <div class="card-badges"><span class="badge status-badge"></span></div>
+      </div>
+      <h3 class="item-name"></h3>
+      <p class="item-description"></p>
+      <div class="card-metrics">
+        <div><span>Budget</span><strong class="item-budget"></strong></div>
+        <div><span>People</span><strong class="item-slots"></strong></div>
+      </div>
+      <div class="funding-block">
+        <div class="funding-line"><span>Contributed</span><strong class="funding-value"></strong></div>
+        <div class="progress-track"><div class="progress-fill card-progress"></div></div>
+        <small class="split-note"></small>
+      </div>
+      <div class="participants-row">
+        <div class="avatar-stack"></div>
+        <span class="participant-summary"></span>
+      </div>
+      <div class="idea-strip hidden">
+        <span class="idea-byline"></span>
+        <button class="idea-vote-button" type="button"></button>
+      </div>
+      <div class="card-actions">
+        <button class="button button-primary join-button" type="button"></button>
+        <button class="button button-ghost details-button" type="button">Details</button>
+      </div>
+    </article>
+  </template>
+
+  <script>
+    window.addEventListener("error", function (event) {
+      const loading = document.getElementById("loading-screen");
+      if (!loading || loading.classList.contains("done")) return;
+      const message = loading.querySelector("strong");
+      if (message) message.textContent = "The planning room could not start. Refresh the page, or check the browser console.";
+      console.error("Birthday Circle startup error:", event.error || event.message);
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+      const loading = document.getElementById("loading-screen");
+      if (!loading || loading.classList.contains("done")) return;
+      const message = loading.querySelector("strong");
+      if (message) message.textContent = "The planning room could not start. Refresh the page, or check the browser console.";
+      console.error("Birthday Circle startup rejection:", event.reason);
+    });
+  </script>
+  <script src="config.js?v=dual-bday-v17"></script>
+  <script type="module" src="app.js?v=dual-bday-v17"></script>
+</body>
+</html>
