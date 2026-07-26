@@ -42,14 +42,17 @@ const state = {
   query: "",
   sort: "recommended",
   activeItemId: null,
-  channel: null
+  channel: null,
+  pendingProtectionEmail: ""
 };
 
 const els = {
   loading: $("#loading-screen"), app: $("#app"), joinDialog: $("#join-dialog"), joinForm: $("#join-form"),
   joinName: $("#join-name"), joinCode: $("#join-code"), joinError: $("#join-error"), demoHint: $("#demo-hint"),
+  recoveryEmail: $("#recovery-email"), recoveryButton: $("#recovery-button"), recoveryStatus: $("#recovery-status"),
   itemDialog: $("#item-dialog"), itemDetail: $("#item-detail"), profileDialog: $("#profile-dialog"),
   profileForm: $("#profile-form"), profileName: $("#profile-name"), sidebar: $("#sidebar"), sidebarBackdrop: $("#sidebar-backdrop"),
+  accountEmail: $("#account-email"), protectAccountButton: $("#protect-account-button"), accountProtectionStatus: $("#account-protection-status"),
   grid: $("#items-grid"), activity: $("#activity-list"),
   search: $("#search-input"), sort: $("#sort-select"), dropZone: $("#drop-zone"),
   template: $("#item-card-template"), connection: $("#connection-pill"), modeBanner: $("#mode-banner"),
@@ -62,6 +65,42 @@ const els = {
   notificationButton: $("#notification-button"), notificationBadge: $("#notification-badge"),
   notificationPanel: $("#notification-panel"), notificationList: $("#notification-list")
 };
+
+function authRedirectUrl() {
+  const url = new URL(window.location.href);
+  url.hash = "";
+  url.search = "";
+  return url.toString();
+}
+function hasRecoverableAccount() {
+  return Boolean(state.user?.email);
+}
+function syncAccountProtectionUI(message = "") {
+  if (!els.accountEmail || !els.protectAccountButton || !els.accountProtectionStatus) return;
+  const protectedAccount = hasRecoverableAccount();
+  els.accountEmail.value = protectedAccount ? state.user.email : state.pendingProtectionEmail;
+  els.accountEmail.disabled = protectedAccount;
+  els.protectAccountButton.disabled = protectedAccount || state.mode === "demo";
+  els.protectAccountButton.textContent = protectedAccount ? "Access protected" : "Protect my access";
+  els.accountProtectionStatus.className = `account-protection-status ${protectedAccount ? "success" : ""}`;
+  els.accountProtectionStatus.textContent = message || (protectedAccount
+    ? `Protected with ${state.user.email}. You can recover this same account from another browser.`
+    : "Add an email now so your joined items, contributions, votes, and role stay recoverable.");
+}
+function openProfileDialog() {
+  els.profileName.value = state.member?.display_name || "";
+  syncNotificationControls();
+  syncAccountProtectionUI();
+  if (!els.profileDialog.open) els.profileDialog.showModal();
+}
+function promptAccountProtection() {
+  if (state.mode !== "supabase" || hasRecoverableAccount()) return;
+  window.setTimeout(() => {
+    openProfileDialog();
+    els.accountEmail?.focus();
+    toast("Protect your access with email before closing the site.");
+  }, 650);
+}
 
 function money(value) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: config.CURRENCY || "USD", maximumFractionDigits: 2 }).format(Number(value || 0));
@@ -365,7 +404,7 @@ async function initialize() {
   try {
     const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
     state.client = createClient(config.SUPABASE_URL, config.SUPABASE_PUBLISHABLE_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true }
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
 
     let { data: sessionData } = await state.client.auth.getSession();
@@ -442,6 +481,7 @@ function enterApp() {
   els.app.classList.remove("hidden");
   syncProfileUI();
   syncNotificationControls();
+  syncAccountProtectionUI();
   renderEverything();
   setConnection(state.mode === "demo" ? "Demo mode" : "Live", state.mode === "demo" ? "offline" : "online");
   hideLoading();
@@ -543,7 +583,7 @@ function bindStaticEvents() {
     els.joinError.textContent = "";
     const button = $("button[type='submit']", els.joinForm);
     button.disabled = true;
-    try { await joinRoom(name, code); launchWelcomeConfetti(); }
+    try { await joinRoom(name, code); launchWelcomeConfetti(); promptAccountProtection(); }
     catch (error) { els.joinError.textContent = error.message || "Could not join this room."; }
     finally { button.disabled = false; }
   });
@@ -569,15 +609,13 @@ function bindStaticEvents() {
     try { state.mode === "demo" ? await loadDemoData() : await loadAllData(); toast("Board refreshed."); }
     catch (error) { fail(error); }
   });
-  $("#profile-button").addEventListener("click", () => {
-    els.profileName.value = state.member?.display_name || "";
-    syncNotificationControls();
-    els.profileDialog.showModal();
-  });
+  $("#profile-button").addEventListener("click", openProfileDialog);
   $("#close-profile-dialog").addEventListener("click", () => els.profileDialog.close());
   $("#close-item-dialog").addEventListener("click", () => els.itemDialog.close());
   $("#leave-room-button").addEventListener("click", leaveDevice);
   els.profileForm.addEventListener("submit", updateProfile);
+  els.protectAccountButton?.addEventListener("click", protectCurrentAccount);
+  els.recoveryButton?.addEventListener("click", sendRecoveryLink);
   $("#suggest-venue-button").addEventListener("click", () => { $("#venue-form-error").textContent=""; els.venueForm.reset(); $("#venue-price").value="0"; $("#venue-nights").value="1"; $("#venue-capacity").value="10"; els.venueDialog.showModal(); });
   $("#close-venue-dialog").addEventListener("click", () => els.venueDialog.close());
   els.venueForm.addEventListener("submit", suggestVenue);
@@ -615,9 +653,7 @@ function bindStaticEvents() {
   $("#mark-notifications-read").addEventListener("click", markNotificationsRead);
   $("#open-notification-settings").addEventListener("click", () => {
     openNotificationPanel(false);
-    els.profileName.value = state.member?.display_name || "";
-    syncNotificationControls();
-    els.profileDialog.showModal();
+    openProfileDialog();
   });
   els.notificationPanel.addEventListener("click", event => event.stopPropagation());
   document.addEventListener("click", () => openNotificationPanel(false));
@@ -1247,6 +1283,70 @@ function relativeTime(value) {
   return "now";
 }
 
+async function protectCurrentAccount() {
+  if (state.mode !== "supabase") return toast("Email recovery is available after Supabase is connected.", "error");
+  if (hasRecoverableAccount()) return syncAccountProtectionUI();
+  const email = els.accountEmail.value.trim().toLowerCase();
+  if (!email || !els.accountEmail.checkValidity()) {
+    els.accountProtectionStatus.textContent = "Enter a valid email address.";
+    els.accountEmail.reportValidity();
+    return;
+  }
+
+  const button = els.protectAccountButton;
+  button.disabled = true;
+  els.accountProtectionStatus.className = "account-protection-status";
+  els.accountProtectionStatus.textContent = "Sending your verification email…";
+
+  try {
+    const { data, error } = await state.client.auth.updateUser(
+      { email },
+      { emailRedirectTo: authRedirectUrl() }
+    );
+    if (error) throw error;
+    if (data?.user) state.user = data.user;
+    state.pendingProtectionEmail = email;
+    syncAccountProtectionUI(`Verification sent to ${email}. Open the email and click the confirmation link. Do not press “Leave this device” before confirming.`);
+    toast("Verification email sent. Your current contributions stay attached to this account.");
+  } catch (error) {
+    button.disabled = false;
+    els.accountProtectionStatus.textContent = error?.message || "Could not protect this account.";
+    fail(error, "Could not protect this account.");
+  }
+}
+
+async function sendRecoveryLink() {
+  if (state.mode !== "supabase") return;
+  const email = els.recoveryEmail.value.trim().toLowerCase();
+  if (!email || !els.recoveryEmail.checkValidity()) {
+    els.recoveryStatus.textContent = "Enter the email you previously protected your access with.";
+    els.recoveryEmail.reportValidity();
+    return;
+  }
+
+  const button = els.recoveryButton;
+  button.disabled = true;
+  els.recoveryStatus.className = "recovery-status";
+  els.recoveryStatus.textContent = "Sending a secure sign-in link…";
+
+  try {
+    const { error } = await state.client.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: authRedirectUrl()
+      }
+    });
+    if (error) throw error;
+    els.recoveryStatus.className = "recovery-status success";
+    els.recoveryStatus.textContent = "Check your email and open the sign-in link. It will restore your original room account.";
+  } catch (error) {
+    els.recoveryStatus.className = "recovery-status error";
+    els.recoveryStatus.textContent = error?.message || "Could not send the sign-in link.";
+    button.disabled = false;
+  }
+}
+
 async function updateProfile(event) {
   event.preventDefault();
   const name = els.profileName.value.trim();
@@ -1271,7 +1371,10 @@ async function updateProfile(event) {
   } catch (error) { fail(error, "Could not update your profile."); }
 }
 async function leaveDevice() {
-  if (!confirm("Remove this room from this device? Your existing item contributions will remain visible to the group.")) return;
+  const warning = hasRecoverableAccount()
+    ? "Sign out on this device? You can return later using your protected email account."
+    : "Remove this room from this device? This account is not protected with email, so you may permanently lose control of your existing contributions.";
+  if (!confirm(warning)) return;
   if (state.mode === "demo") {
     localStorage.removeItem(`${demoPrefix}membership`);
     location.reload();
