@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,650;9..144,750&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=dual-bday-v17">
+  <link rel="stylesheet" href="styles.css?v=dual-bday-v18">
   <style>
     .loading-heart-box {
       width: 118px;
@@ -124,13 +124,17 @@
 
       <section class="access-recovery" aria-labelledby="recovery-title">
         <p class="eyebrow">ALREADY JOINED BEFORE?</p>
-        <h2 id="recovery-title">Restore your original access</h2>
-        <p>Use the email you connected to your account to recover your joined items, contributions, votes, and role.</p>
+        <h2 id="recovery-title">Sign in to your original account</h2>
+        <p>Use the email and password you connected to your account. No email link is needed for normal sign-ins.</p>
         <label class="field">
-          <span>Your protected email</span>
+          <span>Email address</span>
           <input id="recovery-email" type="email" autocomplete="email" placeholder="you@example.com">
         </label>
-        <button id="recovery-button" class="button button-ghost button-wide" type="button">Email me a sign-in link</button>
+        <label class="field">
+          <span>Password</span>
+          <input id="recovery-password" type="password" minlength="8" maxlength="128" autocomplete="current-password" placeholder="Enter your password">
+        </label>
+        <button id="recovery-button" class="button button-ghost button-wide" type="button">Sign in with email and password</button>
         <p id="recovery-status" class="recovery-status" role="status"></p>
       </section>
     </form>
@@ -156,12 +160,22 @@
       <section class="account-protection" aria-labelledby="account-protection-title">
         <p class="eyebrow">ACCOUNT RECOVERY</p>
         <h3 id="account-protection-title">Protect your planning access</h3>
-        <p>Connect an email to this exact account so you can return from another browser without losing control of your contributions.</p>
+        <p id="account-protection-copy">First verify your email once. After verification, return here and create a password for normal sign-ins.</p>
         <label class="field">
           <span>Email address</span>
           <input id="account-email" type="email" autocomplete="email" placeholder="you@example.com">
         </label>
-        <button id="protect-account-button" class="button button-primary button-wide" type="button">Protect my access</button>
+        <div id="account-password-fields" class="hidden">
+          <label class="field">
+            <span>Create password</span>
+            <input id="account-password" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="At least 8 characters">
+          </label>
+          <label class="field">
+            <span>Confirm password</span>
+            <input id="account-password-confirm" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Type the password again">
+          </label>
+        </div>
+        <button id="protect-account-button" class="button button-primary button-wide" type="button">Send verification email</button>
         <p id="account-protection-status" class="account-protection-status" role="status"></p>
       </section>
 
@@ -488,7 +502,7 @@
       console.error("Birthday Circle startup rejection:", event.reason);
     });
   </script>
-  <script src="config.js?v=999?v=dual-bday-v17"></script>
-  <script type="module" src="app.js?v=email-access-v1"></script>
+  <script src="config.js?v=dual-bday-v17"></script>
+  <script type="module" src="app.js?v=password-access-v2"></script>
 </body>
 </html>
