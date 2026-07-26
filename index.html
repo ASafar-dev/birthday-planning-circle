@@ -11,17 +11,49 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,650;9..144,750&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=dual-bday-v17">
+  <style>
+    .loading-heart-box {
+      width: 104px;
+      height: 104px;
+      padding: 8px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border: 2px solid rgba(174, 255, 206, 0.62);
+      border-radius: 24px;
+      background: rgba(235, 255, 242, 0.12);
+      box-shadow:
+        0 14px 38px rgba(64, 220, 107, 0.28),
+        inset 0 0 20px rgba(255, 255, 255, 0.08);
+      animation: loading-heart-pulse 1.35s ease-in-out infinite;
+    }
+
+    .loading-heart-box img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+    }
+
+    @keyframes loading-heart-pulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.9;
+      }
+      50% {
+        transform: scale(1.06);
+        opacity: 1;
+      }
+    }
+  </style>
 </head>
 <body>
   <div id="loading-screen" class="loading-screen">
-    <div
-      class="loading-mark"
-      style="width:92px;height:92px;padding:10px;overflow:hidden;border:1px solid rgba(188,255,207,.38);border-radius:22px;background:linear-gradient(145deg,rgba(17,49,31,.96),rgba(5,20,12,.96)) !important;box-shadow:0 12px 34px rgba(64,220,107,.24),inset 0 0 22px rgba(177,255,200,.10) !important;"
-    >
+    <div class="loading-heart-box">
       <img
-        src="assets/theme/heart.png?v=2"
+        src="assets/theme/heart.png?v=4"
         alt="Blue and green heart logo"
-        style="display:block;width:100%;height:100%;object-fit:contain;object-position:center;border-radius:13px;"
       >
     </div>
     <strong>Opening the planning room…</strong>
